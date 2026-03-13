@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kitap</string>
+    <string name="title_activity_main">Kitap</string>
+    <string name="package_name">com.ayktyk.kitap</string>
+    <string name="custom_url_scheme">com.ayktyk.kitap</string>
+</resources>
