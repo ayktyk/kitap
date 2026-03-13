@@ -4,6 +4,8 @@ export interface Quote {
   page?: number;
 }
 
+export type BookStatus = 'READING' | 'WANT_TO_READ' | 'READ' | 'ABANDONED';
+
 export interface Book {
   id: string;
   title: string;
@@ -11,6 +13,8 @@ export interface Book {
   coverUrl?: string; // URL for cover image
   rating: number; // 1-10
   pageCount: number;
+  genre?: string;
+  status: BookStatus;
   
   // Reading Process
   startDate: string;
