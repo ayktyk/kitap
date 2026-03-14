@@ -23,27 +23,48 @@ const mapRowToBook = (row: any): Book => ({
   createdAt: new Date(row.created_at).getTime(),
 });
 
-// Helper to map Book interface to DB row
-const mapBookToRow = (book: Book, userId: string): any => ({
-  id: book.id,
-  user_id: userId,
-  title: book.title,
-  author: book.author,
-  status: book.status,
-  genre: book.genre,
-  rating: book.rating,
-  page_count: book.pageCount,
-  start_date: book.startDate || null,
-  end_date: book.endDate || null,
-  start_location: book.startLocation,
-  end_location: book.endLocation,
-  purchase_date: book.purchaseDate || null,
-  purchase_location: book.purchaseLocation,
-  thoughts: book.thoughts,
-  quotes: book.quotes,
-  cover_url: book.coverUrl,
-  is_favorite: book.isFavorite || (book.rating === 10),
-});
+const mapBookToRow = (
+  book: Book,
+  userId: string,
+  options?: {
+    includeCoverUrl?: boolean;
+    includeIsFavorite?: boolean;
+  },
+): Record<string, unknown> => {
+  const row: Record<string, unknown> = {
+    id: book.id,
+    user_id: userId,
+    title: book.title,
+    author: book.author,
+    status: book.status,
+    genre: book.genre,
+    rating: book.rating,
+    page_count: book.pageCount,
+    start_date: book.startDate || null,
+    end_date: book.endDate || null,
+    start_location: book.startLocation,
+    end_location: book.endLocation,
+    purchase_date: book.purchaseDate || null,
+    purchase_location: book.purchaseLocation,
+    thoughts: book.thoughts,
+    quotes: book.quotes,
+  };
+
+  if (options?.includeCoverUrl !== false) {
+    row.cover_url = book.coverUrl || '';
+  }
+
+  if (options?.includeIsFavorite !== false) {
+    row.is_favorite = book.isFavorite || book.rating === 10;
+  }
+
+  return row;
+};
+
+const isMissingColumnError = (error: { message?: string } | null, columnName: string) => {
+  const message = error?.message?.toLowerCase() || '';
+  return message.includes(columnName.toLowerCase()) && message.includes('column');
+};
 
 export const getBooks = async (): Promise<Book[]> => {
   const { data, error } = await supabase
@@ -64,16 +85,39 @@ export const saveBook = async (book: Book): Promise<void> => {
   const user = session?.user;
   if (!user) throw new Error('User not authenticated');
 
-  const row = mapBookToRow(book, user.id);
+  const fullRow = mapBookToRow(book, user.id);
   
   const { error } = await supabase
     .from('books')
-    .upsert(row);
+    .upsert(fullRow);
 
-  if (error) {
-    console.error('Error saving book:', error);
-    throw error;
+  if (!error) {
+    return;
   }
+
+  const shouldRetryWithoutCoverUrl = isMissingColumnError(error, 'cover_url');
+  const shouldRetryWithoutIsFavorite = isMissingColumnError(error, 'is_favorite');
+
+  if (shouldRetryWithoutCoverUrl || shouldRetryWithoutIsFavorite) {
+    const fallbackRow = mapBookToRow(book, user.id, {
+      includeCoverUrl: !shouldRetryWithoutCoverUrl,
+      includeIsFavorite: !shouldRetryWithoutIsFavorite,
+    });
+
+    const { error: fallbackError } = await supabase
+      .from('books')
+      .upsert(fallbackRow);
+
+    if (!fallbackError) {
+      return;
+    }
+
+    console.error('Error saving book after fallback:', fallbackError);
+    throw fallbackError;
+  }
+
+  console.error('Error saving book:', error);
+  throw error;
 };
 
 export const deleteBook = async (id: string): Promise<void> => {

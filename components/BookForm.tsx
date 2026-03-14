@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  BookOpen,
   Calendar,
   Camera,
   Loader2,
   MapPin,
-  BookOpen,
   Plus,
   Save,
   ShoppingBag,
@@ -27,30 +27,49 @@ interface Props {
 
 const tabs = [
   { name: 'Genel Bilgiler', icon: <BookOpen size={18} /> },
-  { name: 'Okuma Süreci', icon: <Calendar size={18} /> },
+  { name: 'Okuma Sureci', icon: <Calendar size={18} /> },
   { name: 'Edinme', icon: <ShoppingBag size={18} /> },
-  { name: 'Düşünceler & Alıntılar', icon: <BookOpen size={18} /> },
+  { name: 'Dusunceler ve Alintilar', icon: <BookOpen size={18} /> },
 ];
 
 const getUploadErrorMessage = (error: unknown) => {
   const message =
     typeof error === 'object' && error && 'message' in error ? String(error.message) : '';
-
   const loweredMessage = message.toLowerCase();
 
   if (loweredMessage.includes('bucket')) {
-    return 'Kapak yükleme alanı henüz hazır değil. Supabase storage kurulumu tamamlanmalı.';
+    return 'Kapak yukleme alani henuz hazir degil. Supabase storage kurulumu tamamlanmali.';
   }
 
   if (loweredMessage.includes('row-level security') || loweredMessage.includes('permission')) {
-    return 'Kapak yükleme yetkisi eksik görünüyor. Storage policy ayarları kontrol edilmeli.';
+    return 'Kapak yukleme yetkisi eksik gorunuyor. Storage policy ayarlari kontrol edilmeli.';
   }
 
   if (loweredMessage.includes('authenticated') || loweredMessage.includes('jwt')) {
-    return 'Kapak yüklemek için tekrar giriş yapman gerekebilir.';
+    return 'Kapak yuklemek icin tekrar giris yapman gerekebilir.';
   }
 
-  return 'Kapak resmi yüklenemedi. Şimdilik kapaksız kaydedebilir veya daha sonra tekrar deneyebilirsin.';
+  return 'Kapak resmi yuklenemedi. Simdilik kapaksiz kaydedebilir veya daha sonra tekrar deneyebilirsin.';
+};
+
+const getSaveErrorMessage = (error: unknown) => {
+  const message =
+    typeof error === 'object' && error && 'message' in error ? String(error.message) : '';
+  const loweredMessage = message.toLowerCase();
+
+  if (loweredMessage.includes('cover_url') || loweredMessage.includes('is_favorite')) {
+    return 'Veritabani tablosu yeni alanlarla tam uyumlu degil. Kitap tablosunu guncellememiz gerekebilir.';
+  }
+
+  if (loweredMessage.includes('permission') || loweredMessage.includes('row-level security')) {
+    return 'Kaydetme yetkisi hatasi var. Supabase RLS ayarlari kontrol edilmeli.';
+  }
+
+  if (loweredMessage.includes('json') || loweredMessage.includes('invalid input')) {
+    return 'Kayit verilerinden biri veritabaninda kabul edilmedi. Alinti veya ek alanlari kontrol et.';
+  }
+
+  return 'Kitap kaydedilemedi. Lutfen tekrar deneyin.';
 };
 
 const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, onDelete }) => {
@@ -93,7 +112,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
       if (book.purchaseLocation) locations.add(book.purchaseLocation);
     });
 
-    setLocationSuggestions(Array.from(locations).sort((left, right) => left.localeCompare(right, 'tr')));
+    setLocationSuggestions(Array.from(locations).sort((a, b) => a.localeCompare(b, 'tr')));
   }, [allBooks]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,7 +135,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
   const handleSaveClick = async () => {
     if (!formData.title.trim()) {
-      alert('Kitap adı zorunlu.');
+      alert('Kitap adi zorunlu.');
       return;
     }
 
@@ -134,7 +153,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
       });
     } catch (error) {
       console.error('Save failed:', error);
-      alert('Kitap kaydedilemedi. Lütfen tekrar deneyin.');
+      alert(getSaveErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -194,12 +213,14 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
   };
 
   return (
-    <div className="glass rounded-3xl max-w-4xl mx-auto overflow-hidden flex flex-col h-full md:h-auto border border-white/5 shadow-2xl animate-fade-in-up relative">
+    <div className="glass rounded-3xl max-w-4xl mx-auto overflow-hidden flex flex-col border border-white/5 shadow-2xl animate-fade-in-up relative">
       <div className="bg-white/5 border-b border-white/5 p-6 flex justify-between items-center backdrop-blur-3xl">
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => setFormData((previous) => ({ ...previous, isFavorite: !previous.isFavorite }))}
+            onClick={() =>
+              setFormData((previous) => ({ ...previous, isFavorite: !previous.isFavorite }))
+            }
             className={`p-3 rounded-2xl border transition-all cursor-pointer ${
               formData.isFavorite || formData.rating === 10
                 ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
@@ -212,10 +233,10 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
           <div>
             <h2 className="text-2xl font-serif font-bold text-white leading-none">
-              {initialData ? 'Kitabı Düzenle' : 'Yeni Kitap Ekle'}
+              {initialData ? 'Kitabi Duzenle' : 'Yeni Kitap Ekle'}
             </h2>
             <p className="text-white/40 text-[10px] uppercase tracking-widest font-black mt-2">
-              Kütüphane Kayıt Sistemi
+              Kutuphane Kayit Sistemi
             </p>
           </div>
         </div>
@@ -247,22 +268,26 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
         ))}
       </div>
 
-      <div className="p-6 md:p-8 space-y-6 overflow-y-auto max-h-[70vh]">
+      <div className="p-6 md:p-8 space-y-6 overflow-visible md:overflow-y-auto md:max-h-[70vh]">
         {activeTab === 0 && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="space-y-8">
             <div className="flex flex-col md:flex-row gap-8 items-start">
               <div className="relative shrink-0 mx-auto md:mx-0">
                 <button
                   type="button"
                   className="w-40 h-60 bg-white/5 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-white/20 transition-all overflow-hidden bg-cover bg-center relative"
-                  style={formData.coverUrl ? { backgroundImage: `url(${formData.coverUrl})`, borderStyle: 'solid' } : {}}
+                  style={
+                    formData.coverUrl
+                      ? { backgroundImage: `url(${formData.coverUrl})`, borderStyle: 'solid' }
+                      : {}
+                  }
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {!formData.coverUrl && !uploading && (
                     <>
                       <Camera className="text-white/20" size={32} />
                       <span className="text-[10px] text-white/30 font-black uppercase tracking-widest text-center px-4">
-                        Kapak Fotoğrafı Yükle
+                        Kapak Fotografi Yukle
                       </span>
                     </>
                   )}
@@ -276,7 +301,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                   {formData.coverUrl && !uploading && (
                     <div className="absolute inset-0 bg-black/10 hover:bg-black/55 transition-all flex items-center justify-center">
                       <span className="text-[10px] text-white font-black uppercase tracking-widest p-2 bg-white/10 rounded-lg backdrop-blur-md border border-white/20">
-                        Değiştir
+                        Degistir
                       </span>
                     </div>
                   )}
@@ -291,7 +316,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                 />
 
                 <p className="text-[10px] uppercase tracking-widest font-black text-white/25 mt-3 text-center">
-                  Kapak görseli opsiyonel
+                  Kapak gorseli opsiyonel
                 </p>
 
                 {uploadError && (
@@ -303,13 +328,13 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
               <div className="flex-1 grid md:grid-cols-2 gap-6 w-full">
                 <div className="space-y-2 col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-white/60">Kitap Adı</label>
+                  <label className="block text-sm font-semibold text-white/60">Kitap Adi</label>
                   <input
                     type="text"
                     value={formData.title}
                     onChange={(event) => setFormData((previous) => ({ ...previous, title: event.target.value }))}
                     className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
-                    placeholder="Örn: Suç ve Ceza"
+                    placeholder="Orn: Suc ve Ceza"
                   />
                 </div>
 
@@ -320,12 +345,12 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     value={formData.author}
                     onChange={(event) => setFormData((previous) => ({ ...previous, author: event.target.value }))}
                     className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
-                    placeholder="Örn: Fyodor Dostoyevski"
+                    placeholder="Orn: Fyodor Dostoyevski"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-white/60">Sayfa Sayısı</label>
+                  <label className="block text-sm font-semibold text-white/60">Sayfa Sayisi</label>
                   <input
                     type="number"
                     value={formData.pageCount || ''}
@@ -350,7 +375,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none transition-all appearance-none cursor-pointer"
                   >
                     <option value="WANT_TO_READ" className="bg-zinc-900 text-white">
-                      Okumak İstiyorum
+                      Okumak Istiyorum
                     </option>
                     <option value="READING" className="bg-zinc-900 text-white">
                       Okuyorum
@@ -359,25 +384,25 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                       Okundu
                     </option>
                     <option value="ABANDONED" className="bg-zinc-900 text-white">
-                      Yarım Bıraktım
+                      Yarim Biraktim
                     </option>
                   </select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-white/60">Tür</label>
+                  <label className="block text-sm font-semibold text-white/60">Tur</label>
                   <input
                     type="text"
                     value={formData.genre}
                     onChange={(event) => setFormData((previous) => ({ ...previous, genre: event.target.value }))}
                     className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
-                    placeholder="Örn: Klasik, Bilim Kurgu"
+                    placeholder="Orn: Klasik, Bilim Kurgu"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-white/60 font-black text-[10px] uppercase tracking-widest">
-                    Kişisel Puanım
+                    Kisisel Puanim
                   </label>
                   <div className="p-3 border border-white/5 rounded-xl bg-white/[0.02]">
                     <RatingStars
@@ -393,12 +418,12 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
         )}
 
         {activeTab === 1 && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="space-y-6">
             <div className="grid md:grid-cols-2 gap-8">
               <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-4">
                 <h3 className="font-serif font-bold text-white flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.5)]" />
-                  Başlangıç
+                  Baslangic
                 </h3>
 
                 <div className="space-y-4">
@@ -409,9 +434,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     <input
                       type="date"
                       value={formData.startDate}
-                      onChange={(event) =>
-                        setFormData((previous) => ({ ...previous, startDate: event.target.value }))
-                      }
+                      onChange={(event) => setFormData((previous) => ({ ...previous, startDate: event.target.value }))}
                       className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
                     />
                   </div>
@@ -431,7 +454,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                         onFocus={() => setActiveSuggestionField('startLocation')}
                         onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
                         className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
-                        placeholder="Örn: İstanbul, Ev"
+                        placeholder="Orn: Istanbul, Ev"
                       />
                       {renderAutocomplete('startLocation', formData.startLocation)}
                     </div>
@@ -442,7 +465,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
               <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-4">
                 <h3 className="font-serif font-bold text-white flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
-                  Bitiş
+                  Bitis
                 </h3>
 
                 <div className="space-y-4">
@@ -453,9 +476,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     <input
                       type="date"
                       value={formData.endDate}
-                      onChange={(event) =>
-                        setFormData((previous) => ({ ...previous, endDate: event.target.value }))
-                      }
+                      onChange={(event) => setFormData((previous) => ({ ...previous, endDate: event.target.value }))}
                       className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
                     />
                   </div>
@@ -475,7 +496,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                         onFocus={() => setActiveSuggestionField('endLocation')}
                         onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
                         className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
-                        placeholder="Örn: İzmir, Tatil"
+                        placeholder="Orn: Izmir, Tatil"
                       />
                       {renderAutocomplete('endLocation', formData.endLocation)}
                     </div>
@@ -487,10 +508,10 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
         )}
 
         {activeTab === 2 && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="space-y-6">
             <div className="bg-white/5 p-8 rounded-2xl border border-white/5 grid md:grid-cols-2 gap-8">
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-white/60">Satın Alma Tarihi</label>
+                <label className="block text-sm font-semibold text-white/60">Satin Alma Tarihi</label>
                 <input
                   type="date"
                   value={formData.purchaseDate}
@@ -502,7 +523,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
               </div>
 
               <div className="space-y-2 relative">
-                <label className="block text-sm font-semibold text-white/60">Satın Alınan Yer</label>
+                <label className="block text-sm font-semibold text-white/60">Satin Alinan Yer</label>
                 <div className="relative">
                   <ShoppingBag size={18} className="absolute left-3.5 top-4 text-white/20" />
                   <input
@@ -514,7 +535,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     onFocus={() => setActiveSuggestionField('purchaseLocation')}
                     onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
                     className="w-full pl-11 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all font-medium"
-                    placeholder="Örn: D&R, Amazon, Sahaf"
+                    placeholder="Orn: D&R, Amazon, Sahaf"
                   />
                   {renderAutocomplete('purchaseLocation', formData.purchaseLocation)}
                 </div>
@@ -524,34 +545,34 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
         )}
 
         {activeTab === 3 && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="space-y-8">
             <div className="space-y-3">
-              <label className="block text-sm font-semibold text-white/60">Kitap Hakkındaki Düşüncelerim</label>
+              <label className="block text-sm font-semibold text-white/60">Kitap hakkindaki dusuncelerim</label>
               <textarea
                 value={formData.thoughts}
                 onChange={(event) => setFormData((previous) => ({ ...previous, thoughts: event.target.value }))}
                 className="w-full p-6 bg-white/5 text-white border border-white/10 rounded-2xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none h-48 resize-none font-serif leading-relaxed placeholder:text-white/10 transition-all"
-                placeholder="Bu kitap bana neler hissettirdi? En sevdiğin bölüm neydi?"
+                placeholder="Bu kitap bana neler hissettirdi?"
               />
             </div>
 
             <div className="space-y-6">
               <div className="flex justify-between items-center gap-4">
-                <label className="block text-xl font-serif font-bold text-white">Alıntılar</label>
+                <label className="block text-xl font-serif font-bold text-white">Alintilar</label>
                 <button
                   type="button"
                   onClick={addQuote}
                   className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-white/10 hover:bg-white/20 transition-all px-4 py-3 rounded-full border border-white/10 shadow-lg cursor-pointer active:scale-95"
                 >
                   <Plus size={14} />
-                  Yeni Alıntı Ekle
+                  Yeni Alinti Ekle
                 </button>
               </div>
 
               <div className="space-y-4">
                 {formData.quotes.length === 0 && (
                   <div className="text-center py-12 border-2 border-dashed border-white/5 rounded-2xl text-white/20 text-sm font-serif italic">
-                    Henüz hiçbir alıntı eklenmedi.
+                    Henuz hicbir alinti eklenmedi.
                   </div>
                 )}
 
@@ -565,7 +586,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                         value={quote.text}
                         onChange={(event) => updateQuote(quote.id, 'text', event.target.value)}
                         className="w-full bg-transparent border-none focus:ring-0 p-0 text-white font-serif italic resize-none placeholder-white/10 leading-relaxed overflow-hidden"
-                        placeholder="Alıntıyı buraya yazın..."
+                        placeholder="Alintiyi buraya yazin..."
                         rows={2}
                       />
 
@@ -604,7 +625,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
         {initialData && onDelete ? (
           <div className="relative">
             {showConfirmDelete ? (
-              <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 transition-all">
+              <div className="flex items-center gap-3 transition-all">
                 <span className="text-[10px] font-black text-red-400 uppercase tracking-widest whitespace-nowrap">
                   Emin misiniz?
                 </span>
@@ -620,7 +641,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                   onClick={() => setShowConfirmDelete(false)}
                   className="text-white/40 hover:text-white text-[10px] font-black uppercase tracking-widest px-4 cursor-pointer"
                 >
-                  Vazgeç
+                  Vazgec
                 </button>
               </div>
             ) : (
@@ -630,7 +651,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                 className="flex items-center gap-2 text-white/20 hover:text-red-400 hover:bg-red-500/5 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-transparent hover:border-red-500/10 cursor-pointer"
               >
                 <Trash2 size={16} />
-                Kitabı Sil
+                Kitabi Sil
               </button>
             )}
           </div>
@@ -644,17 +665,17 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
             onClick={onCancel}
             className="flex-1 md:flex-none px-8 py-4 rounded-xl border border-white/10 text-white/60 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-white/5 transition-all cursor-pointer"
           >
-            İptal
+            Iptal
           </button>
 
           <button
             type="button"
             onClick={handleSaveClick}
             disabled={saving || uploading}
-            className={`flex-1 md:flex-none px-10 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 md:flex-none px-10 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${
               saving || uploading
                 ? 'bg-white/40 text-black/60 cursor-not-allowed'
-                : 'bg-white text-black hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.2)]'
+                : 'bg-white text-black hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.2)] cursor-pointer'
             }`}
           >
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
