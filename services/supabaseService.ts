@@ -89,13 +89,26 @@ export const deleteBook = async (id: string): Promise<void> => {
 };
 
 export const uploadCoverImage = async (file: File): Promise<string> => {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Math.random()}.${fileExt}`;
-  const filePath = `${fileName}`;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const fileName = `${crypto.randomUUID()}.${fileExt}`;
+  const filePath = `${user.id}/${fileName}`;
 
   const { error: uploadError } = await supabase.storage
     .from('book-covers')
-    .upload(filePath, file);
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: file.type || undefined,
+    });
 
   if (uploadError) {
     throw uploadError;
