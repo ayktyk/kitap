@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Barcode,
   BookOpen,
   Calendar,
   Camera,
@@ -13,7 +14,8 @@ import {
   X,
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { Book, Quote } from '../types';
+import { Book, BookLookupResult, Quote } from '../types';
+import { lookupBookByIsbn } from '../services/bookLookupService';
 import { uploadCoverImage } from '../services/supabaseService';
 import RatingStars from './RatingStars';
 
@@ -101,7 +103,15 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
   const [activeSuggestionField, setActiveSuggestionField] = useState<keyof Book | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isbnValue, setIsbnValue] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanLoopRef = useRef<number | null>(null);
 
   useEffect(() => {
     const locations = new Set<string>();
@@ -114,6 +124,17 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
     setLocationSuggestions(Array.from(locations).sort((a, b) => a.localeCompare(b, 'tr')));
   }, [allBooks]);
+
+  useEffect(() => {
+    return () => {
+      if (scanLoopRef.current) {
+        window.clearTimeout(scanLoopRef.current);
+      }
+
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -130,6 +151,115 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
     } finally {
       setUploading(false);
       event.target.value = '';
+    }
+  };
+
+  const applyLookupResult = (result: BookLookupResult) => {
+    setFormData((previous) => ({
+      ...previous,
+      title: result.title || previous.title,
+      author: result.author || previous.author,
+      pageCount: result.pageCount || previous.pageCount,
+      genre: result.genre || result.categories?.[0] || previous.genre,
+      thoughts: previous.thoughts || result.description || '',
+      coverUrl: previous.coverUrl || result.coverUrl || '',
+    }));
+  };
+
+  const handleIsbnLookup = async (rawValue: string) => {
+    try {
+      setLookupLoading(true);
+      setLookupMessage(null);
+      const result = await lookupBookByIsbn(rawValue);
+      applyLookupResult(result);
+      setIsbnValue(result.isbn);
+      setLookupMessage(`Bilgiler dolduruldu. Kaynak: ${result.source}`);
+    } catch (error) {
+      const message =
+        typeof error === 'object' && error && 'message' in error
+          ? String(error.message)
+          : 'ISBN bilgisi alinamadi.';
+      setLookupMessage(message);
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  const stopScanner = () => {
+    if (scanLoopRef.current) {
+      window.clearTimeout(scanLoopRef.current);
+      scanLoopRef.current = null;
+    }
+
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setScannerOpen(false);
+  };
+
+  const startScanLoop = (detector: any) => {
+    const scan = async () => {
+      try {
+        const video = videoRef.current;
+        if (!video || video.readyState < 2) {
+          scanLoopRef.current = window.setTimeout(scan, 250);
+          return;
+        }
+
+        const detectedCodes = await detector.detect(video);
+        const rawValue = detectedCodes?.[0]?.rawValue;
+
+        if (rawValue) {
+          const normalized = rawValue.replace(/[^0-9Xx]/g, '').toUpperCase();
+          if (normalized.length === 10 || normalized.length === 13) {
+            stopScanner();
+            setIsbnValue(normalized);
+            await handleIsbnLookup(normalized);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Barcode scan failed:', error);
+      }
+
+      scanLoopRef.current = window.setTimeout(scan, 350);
+    };
+
+    void scan();
+  };
+
+  const handleStartScanner = async () => {
+    const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: any }).BarcodeDetector;
+
+    if (!BarcodeDetectorCtor) {
+      setScannerError('Bu tarayici barkod taramayi desteklemiyor. ISBN numarasini elle girebilirsin.');
+      setScannerOpen(true);
+      return;
+    }
+
+    try {
+      setScannerError(null);
+      setScannerOpen(true);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      const detector = new BarcodeDetectorCtor({
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'],
+      });
+
+      startScanLoop(detector);
+    } catch (error) {
+      console.error('Unable to start scanner:', error);
+      setScannerError('Kamera acilamadi. Kamera iznini kontrol et veya ISBN numarasini elle gir.');
     }
   };
 
@@ -279,6 +409,53 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
       <div className="p-6 md:p-8 space-y-6 overflow-visible md:overflow-y-auto md:max-h-[70vh]">
         {activeTab === 0 && (
           <div className="space-y-8">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 md:p-5">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-black uppercase tracking-[0.25em] text-white/35 mb-2">
+                    ISBN ile Doldur
+                  </label>
+                  <div className="relative">
+                    <Barcode size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
+                    <input
+                      type="text"
+                      value={isbnValue}
+                      onChange={(event) => setIsbnValue(event.target.value)}
+                      placeholder="978... barkod veya ISBN"
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-white/10 bg-black/20 text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-white/15 focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 lg:self-end">
+                  <button
+                    type="button"
+                    onClick={() => handleIsbnLookup(isbnValue)}
+                    disabled={lookupLoading || !isbnValue.trim()}
+                    className={`px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all ${
+                      lookupLoading || !isbnValue.trim()
+                        ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                        : 'bg-white text-black hover:scale-105 active:scale-95'
+                    }`}
+                  >
+                    {lookupLoading ? 'Araniyor' : 'ISBN Doldur'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleStartScanner}
+                    className="px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all bg-white/10 text-white hover:bg-white/20 active:scale-95"
+                  >
+                    Tara
+                  </button>
+                </div>
+              </div>
+
+              {lookupMessage && (
+                <p className="mt-3 text-xs text-white/55 leading-relaxed">{lookupMessage}</p>
+              )}
+            </div>
+
             <div className="flex flex-col md:flex-row gap-8 items-start">
               <div className="relative shrink-0 mx-auto md:mx-0">
                 <button
@@ -628,6 +805,44 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
           </div>
         )}
       </div>
+
+      {scannerOpen && (
+        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <h3 className="text-white font-bold text-lg">ISBN Tara</h3>
+                <p className="text-white/40 text-xs">Barkodu kameraya dogru tut.</p>
+              </div>
+              <button
+                type="button"
+                onClick={stopScanner}
+                className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-black border border-white/10 flex items-center justify-center">
+                {scannerError ? (
+                  <p className="text-sm text-white/60 px-6 text-center leading-relaxed">{scannerError}</p>
+                ) : (
+                  <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={stopScanner}
+                className="w-full px-4 py-3 rounded-2xl bg-white/10 text-white text-xs font-black uppercase tracking-[0.2em] hover:bg-white/20 transition-all"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="p-8 border-t border-white/5 bg-white/[0.02] flex flex-col md:flex-row justify-between items-center gap-6">
         {initialData && onDelete ? (

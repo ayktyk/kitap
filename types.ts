@@ -44,3 +44,18 @@ export interface BookAIResponse {
   genre?: string;
   suggestedQuotes?: string[];
 }
+
+export interface BookLookupResult {
+  isbn: string;
+  title?: string;
+  author?: string;
+  authors?: string[];
+  description?: string;
+  pageCount?: number;
+  genre?: string;
+  categories?: string[];
+  coverUrl?: string;
+  publisher?: string;
+  publishedDate?: string;
+  source: 'google-books' | 'open-library' | 'wikipedia' | 'combined';
+}
