@@ -159,6 +159,14 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
     }
   };
 
+  const handleRatingChange = (rating: number) => {
+    setFormData((previous) => ({
+      ...previous,
+      rating,
+      status: rating > 0 ? 'READ' : previous.status,
+    }));
+  };
+
   const addQuote = () => {
     setFormData((previous) => ({
       ...previous,
@@ -407,7 +415,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                   <div className="p-3 border border-white/5 rounded-xl bg-white/[0.02]">
                     <RatingStars
                       rating={formData.rating}
-                      onChange={(rating) => setFormData((previous) => ({ ...previous, rating }))}
+                      onChange={handleRatingChange}
                       size={24}
                     />
                   </div>
