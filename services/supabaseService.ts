@@ -19,6 +19,7 @@ const mapRowToBook = (row: any): Book => ({
   thoughts: row.thoughts || '',
   quotes: (row.quotes as Quote[]) || [],
   coverUrl: row.cover_url || '',
+  isFavorite: row.is_favorite || false,
   createdAt: new Date(row.created_at).getTime(),
 });
 
@@ -41,6 +42,7 @@ const mapBookToRow = (book: Book, userId: string): any => ({
   thoughts: book.thoughts,
   quotes: book.quotes,
   cover_url: book.coverUrl,
+  is_favorite: book.isFavorite || (book.rating === 10),
 });
 
 export const getBooks = async (): Promise<Book[]> => {
@@ -84,4 +86,24 @@ export const deleteBook = async (id: string): Promise<void> => {
     console.error('Error deleting book:', error);
     throw error;
   }
+};
+
+export const uploadCoverImage = async (file: File): Promise<string> => {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Math.random()}.${fileExt}`;
+  const filePath = `${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('book-covers')
+    .upload(filePath, file);
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  const { data } = supabase.storage
+    .from('book-covers')
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
 };

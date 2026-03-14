@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Vercel/Vite environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase environment variables are missing!');
+  console.warn('⚠️ Supabase environment variables are missing! Check Vercel Dashboard -> Settings -> Environment Variables.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create client - note: if URL is empty, this instance will fail at runtime when called, 
+// but it won't crash the entire JS bundle loading process.
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder'
+);

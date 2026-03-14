@@ -47,15 +47,18 @@ const BookDetails: React.FC<Props> = ({ book, onBack, onEdit }) => {
         </button>
       </div>
 
-      <div className="max-w-4xl mx-auto px-8 pb-16">
+      <div className="max-w-4xl mx-auto px-4 md:px-8 pb-16">
         {/* Header Info */}
-        <div className="relative -mt-20 mb-12 flex flex-col md:flex-row gap-8 items-start">
-          <div className="w-40 h-60 bg-white/5 rounded-2xl shadow-2xl shrink-0 flex items-center justify-center bg-cover bg-center border-2 border-white/20 transform hover:scale-105 transition-transform duration-500" style={{ backgroundImage: `url('https://picsum.photos/seed/${book.id}/300/450')` }}>
+        <div className="relative -mt-20 mb-12 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
+          <div 
+            className="w-48 h-72 md:w-40 md:h-60 bg-white/5 rounded-3xl shadow-2xl shrink-0 flex items-center justify-center bg-cover bg-center border-2 border-white/20 transform hover:scale-105 transition-transform duration-500 z-10" 
+            style={{ backgroundImage: `url(${book.coverUrl || `https://picsum.photos/seed/${book.id}/300/450`})` }}
+          >
             {!book.coverUrl && <BookOpen className="text-white/10" size={50} />}
           </div>
           
           <div className="pt-2 md:pt-24 flex-1 w-full">
-            <h1 className="text-4xl font-serif font-bold text-white mb-3 tracking-tight">{book.title}</h1>
+            <h1 className="text-4xl md:text-5xl font-serif font-black text-white mb-4 tracking-tighter leading-tight">{book.title}</h1>
             <p className="text-xl text-white/50 mb-6 font-medium">{book.author}</p>
             <div className="flex flex-wrap items-center gap-4 text-xs">
                 <span className={`px-4 py-1.5 rounded-full text-[10px] uppercase font-black tracking-[0.2em] border shadow-lg ${

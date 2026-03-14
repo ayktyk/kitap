@@ -2,7 +2,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { BookAIResponse } from '../types';
 
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey =
+    import.meta.env.VITE_GEMINI_API_KEY ||
+    import.meta.env.VITE_API_KEY ||
+    import.meta.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("API Key is missing. AI features will not work.");
     return null;

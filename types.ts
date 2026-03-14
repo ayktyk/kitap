@@ -5,6 +5,7 @@ export interface Quote {
 }
 
 export type BookStatus = 'READING' | 'WANT_TO_READ' | 'READ' | 'ABANDONED';
+export type BookFilter = BookStatus | 'ALL' | 'FAVORITES';
 
 export interface Book {
   id: string;
@@ -30,6 +31,7 @@ export interface Book {
   thoughts: string;
   quotes: Quote[];
   
+  isFavorite?: boolean;
   createdAt: number;
 }
 
