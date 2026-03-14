@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 import { v4 as uuidv4 } from 'uuid';
 import { Book, BookLookupResult, Quote } from '../types';
 import { lookupBookByIsbn } from '../services/bookLookupService';
@@ -112,6 +113,8 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanLoopRef = useRef<number | null>(null);
+  const scannerControlsRef = useRef<any>(null);
+  const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
 
   useEffect(() => {
     const locations = new Set<string>();
@@ -131,6 +134,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
         window.clearTimeout(scanLoopRef.current);
       }
 
+      scannerControlsRef.current?.stop?.();
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
@@ -191,6 +195,9 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
       scanLoopRef.current = null;
     }
 
+    scannerControlsRef.current?.stop?.();
+    scannerControlsRef.current = null;
+    zxingReaderRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setScannerOpen(false);
@@ -230,33 +237,54 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
   const handleStartScanner = async () => {
     const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: any }).BarcodeDetector;
 
-    if (!BarcodeDetectorCtor) {
-      setScannerError('Bu tarayici barkod taramayi desteklemiyor. ISBN numarasini elle girebilirsin.');
-      setScannerOpen(true);
-      return;
-    }
-
     try {
       setScannerError(null);
+      setLookupMessage(null);
       setScannerOpen(true);
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false,
-      });
+      if (BarcodeDetectorCtor) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
 
-      streamRef.current = stream;
+        streamRef.current = stream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        const detector = new BarcodeDetectorCtor({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'],
+        });
+
+        startScanLoop(detector);
+        return;
       }
 
-      const detector = new BarcodeDetectorCtor({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'],
-      });
+      const reader = new BrowserMultiFormatReader();
+      zxingReaderRef.current = reader;
+      scannerControlsRef.current = await reader.decodeFromVideoDevice(
+        undefined,
+        videoRef.current ?? undefined,
+        async (result, error, controls) => {
+          if (result?.getText()) {
+            const normalized = result.getText().replace(/[^0-9Xx]/g, '').toUpperCase();
+            if (normalized.length === 10 || normalized.length === 13) {
+              scannerControlsRef.current = controls;
+              stopScanner();
+              setIsbnValue(normalized);
+              await handleIsbnLookup(normalized);
+            }
+          }
 
-      startScanLoop(detector);
+          if (error && error.name !== 'NotFoundException') {
+            console.error('ZXing scan error:', error);
+          }
+        },
+      );
     } catch (error) {
       console.error('Unable to start scanner:', error);
       setScannerError('Kamera acilamadi. Kamera iznini kontrol et veya ISBN numarasini elle gir.');
