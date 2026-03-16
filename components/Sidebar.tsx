@@ -1,6 +1,6 @@
 import React from 'react';
 import { BookFilter } from '../types';
-import { X, Library, Star, Settings, LogOut, Clock, Calendar, Bookmark } from 'lucide-react';
+import { X, Library, Star, LogOut, Clock, Calendar, Bookmark } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -80,11 +80,7 @@ const Sidebar: React.FC<Props> = ({ isOpen, onClose, onSignOut, userEmail, activ
 
           {/* Footer */}
           <div className="p-6 border-t border-white/5 space-y-2">
-             <button className="w-full flex items-center gap-3 px-4 py-3 text-white/40 hover:text-white/70 transition-colors text-sm font-semibold rounded-xl">
-               <Settings size={18} className="opacity-40" />
-               Ayarlar
-             </button>
-             <button 
+             <button
                onClick={onSignOut}
                className="w-full flex items-center gap-3 px-4 py-3 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-all text-sm font-black uppercase tracking-widest rounded-xl"
              >

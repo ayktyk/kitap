@@ -257,7 +257,7 @@ const App: React.FC = () => {
                           : option === 'READING'
                             ? 'Okuyorum'
                             : option === 'WANT_TO_READ'
-                              ? 'Gelecek'
+                              ? 'Okunacak'
                               : 'Okundu'}
                     </button>
                   ))}
@@ -309,7 +309,7 @@ const App: React.FC = () => {
                         : option === 'READING'
                           ? 'Okuyor'
                           : option === 'WANT_TO_READ'
-                            ? 'Gelecek'
+                            ? 'Okunacak'
                             : 'Okundu'}
                   </button>
                 ))}
@@ -317,6 +317,10 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-6 mb-8 text-sm text-white/40 flex-wrap">
+              <span className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
+                <span className="font-medium text-white/50">{books.length}</span> kitap
+              </span>
               <span className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.4)]" />
                 <span className="font-medium text-white/50">{visibleReading}</span> okuyor

@@ -67,7 +67,7 @@ const BookDetails: React.FC<Props> = ({ book, onBack, onEdit }) => {
                   'bg-white/5 text-white/60 border-white/10'
                 }`}>
                   {book.status === 'READING' ? 'OKUYORUM' :
-                   book.status === 'WANT_TO_READ' ? 'GELECEK' :
+                   book.status === 'WANT_TO_READ' ? 'OKUNACAK' :
                    book.status === 'READ' ? 'OKUNDU' : 'YARIM'}
                 </span>
                 {book.genre && (

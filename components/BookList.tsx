@@ -81,7 +81,7 @@ const BookList: React.FC<Props> = ({
                 {book.status === 'READING'
                   ? 'OKUYORUM'
                   : book.status === 'WANT_TO_READ'
-                    ? 'GELECEK'
+                    ? 'OKUNACAK'
                     : book.status === 'READ'
                       ? 'OKUNDU'
                       : 'YARIM'}
