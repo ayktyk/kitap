@@ -634,9 +634,9 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
         {activeTab === 1 && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">
+                <label className="block text-sm font-semibold text-white/60">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-2 align-middle" />
                   Başlangıç Tarihi
                 </label>
@@ -644,12 +644,12 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                   type="date"
                   value={formData.startDate}
                   onChange={(event) => setFormData((previous) => ({ ...previous, startDate: event.target.value }))}
-                  className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
+                  className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none text-sm transition-all"
                 />
               </div>
 
               <div className="space-y-2 relative">
-                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">
+                <label className="block text-sm font-semibold text-white/60">
                   Başlangıç Yeri
                 </label>
                 <div className="relative">
@@ -662,7 +662,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     }
                     onFocus={() => setActiveSuggestionField('startLocation')}
                     onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
-                    className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
+                    className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none text-sm transition-all"
                     placeholder="Örn: İstanbul, Ev"
                   />
                   {renderAutocomplete('startLocation', formData.startLocation)}
@@ -670,7 +670,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
               </div>
 
               <div className="space-y-2">
-                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">
+                <label className="block text-sm font-semibold text-white/60">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-2 align-middle" />
                   Bitiş Tarihi
                 </label>
@@ -678,12 +678,12 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                   type="date"
                   value={formData.endDate}
                   onChange={(event) => setFormData((previous) => ({ ...previous, endDate: event.target.value }))}
-                  className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
+                  className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none text-sm transition-all"
                 />
               </div>
 
               <div className="space-y-2 relative">
-                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">
+                <label className="block text-sm font-semibold text-white/60">
                   Bitiş Yeri
                 </label>
                 <div className="relative">
@@ -696,7 +696,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     }
                     onFocus={() => setActiveSuggestionField('endLocation')}
                     onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
-                    className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
+                    className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none text-sm transition-all"
                     placeholder="Örn: İzmir, Tatil"
                   />
                   {renderAutocomplete('endLocation', formData.endLocation)}
@@ -708,7 +708,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
         {activeTab === 2 && (
           <div className="space-y-6">
-            <div className="bg-white/5 p-8 rounded-2xl border border-white/5 grid md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-white/60">Satın Alma Tarihi</label>
                 <input
@@ -717,14 +717,14 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                   onChange={(event) =>
                     setFormData((previous) => ({ ...previous, purchaseDate: event.target.value }))
                   }
-                  className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none transition-all"
+                  className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none text-sm transition-all"
                 />
               </div>
 
               <div className="space-y-2 relative">
                 <label className="block text-sm font-semibold text-white/60">Satın Alınan Yer</label>
                 <div className="relative">
-                  <ShoppingBag size={18} className="absolute left-3.5 top-4 text-white/20" />
+                  <ShoppingBag size={14} className="absolute left-3.5 top-3.5 text-white/20" />
                   <input
                     type="text"
                     value={formData.purchaseLocation}
@@ -733,7 +733,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     }
                     onFocus={() => setActiveSuggestionField('purchaseLocation')}
                     onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
-                    className="w-full pl-11 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all font-medium"
+                    className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 text-sm transition-all"
                     placeholder="Örn: D&R, Amazon, Sahaf"
                   />
                   {renderAutocomplete('purchaseLocation', formData.purchaseLocation)}
@@ -783,10 +783,21 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     <div className="flex-1 space-y-3">
                       <textarea
                         value={quote.text}
-                        onChange={(event) => updateQuote(quote.id, 'text', event.target.value)}
-                        className="w-full bg-transparent border-none focus:ring-0 p-0 text-white font-serif italic resize-none placeholder-white/10 leading-relaxed overflow-hidden"
+                        onChange={(event) => {
+                          updateQuote(quote.id, 'text', event.target.value);
+                          const target = event.target;
+                          target.style.height = 'auto';
+                          target.style.height = `${target.scrollHeight}px`;
+                        }}
+                        ref={(el) => {
+                          if (el) {
+                            el.style.height = 'auto';
+                            el.style.height = `${el.scrollHeight}px`;
+                          }
+                        }}
+                        className="w-full bg-transparent border-none focus:ring-0 p-0 text-white font-serif italic resize-none placeholder-white/10 leading-relaxed"
                         placeholder="Alıntıyı buraya yazın..."
-                        rows={2}
+                        rows={1}
                       />
 
                       <div className="flex items-center gap-4">
