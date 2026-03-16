@@ -484,100 +484,113 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
               )}
             </div>
 
-            <div className="flex flex-col md:flex-row gap-8 items-start">
-              <div className="relative shrink-0 mx-auto md:mx-0">
-                <button
-                  type="button"
-                  className="w-40 h-60 bg-white/5 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-white/20 transition-all overflow-hidden bg-cover bg-center relative"
-                  style={
-                    formData.coverUrl
-                      ? { backgroundImage: `url(${formData.coverUrl})`, borderStyle: 'solid' }
-                      : {}
-                  }
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {!formData.coverUrl && !uploading && (
-                    <>
-                      <Camera className="text-white/20" size={32} />
-                      <span className="text-[10px] text-white/30 font-black uppercase tracking-widest text-center px-4">
-                        Kapak Fotoğrafı Yükle
-                      </span>
-                    </>
-                  )}
+            <div className="flex flex-col gap-6">
+              {/* Cover + Title/Author row */}
+              <div className="flex flex-col sm:flex-row gap-6 items-start">
+                <div className="relative shrink-0 mx-auto sm:mx-0">
+                  <button
+                    type="button"
+                    className="w-28 h-40 bg-white/5 rounded-xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-white/20 transition-all overflow-hidden bg-cover bg-center relative"
+                    style={
+                      formData.coverUrl
+                        ? { backgroundImage: `url(${formData.coverUrl})`, borderStyle: 'solid' }
+                        : {}
+                    }
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {!formData.coverUrl && !uploading && (
+                      <>
+                        <Camera className="text-white/20" size={24} />
+                        <span className="text-[9px] text-white/30 font-black uppercase tracking-widest text-center px-2">
+                          Kapak Yükle
+                        </span>
+                      </>
+                    )}
 
-                  {uploading && (
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                      <Loader2 className="animate-spin text-white" size={24} />
+                    {uploading && (
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                        <Loader2 className="animate-spin text-white" size={20} />
+                      </div>
+                    )}
+
+                    {formData.coverUrl && !uploading && (
+                      <div className="absolute inset-0 bg-black/10 hover:bg-black/55 transition-all flex items-center justify-center">
+                        <span className="text-[9px] text-white font-black uppercase tracking-widest p-1.5 bg-white/10 rounded-lg backdrop-blur-md border border-white/20">
+                          Değiştir
+                        </span>
+                      </div>
+                    )}
+                  </button>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                  />
+
+                  {uploadError && (
+                    <div className="mt-2 p-2 rounded-lg border border-amber-500/20 bg-amber-500/10 text-[10px] text-amber-100 leading-relaxed max-w-[112px]">
+                      {uploadError}
                     </div>
                   )}
+                </div>
 
-                  {formData.coverUrl && !uploading && (
-                    <div className="absolute inset-0 bg-black/10 hover:bg-black/55 transition-all flex items-center justify-center">
-                      <span className="text-[10px] text-white font-black uppercase tracking-widest p-2 bg-white/10 rounded-lg backdrop-blur-md border border-white/20">
-                        Değiştir
-                      </span>
-                    </div>
-                  )}
-                </button>
-
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                />
-
-                <p className="text-[10px] uppercase tracking-widest font-black text-white/25 mt-3 text-center">
-                  Kapak görseli opsiyonel
-                </p>
-
-                {uploadError && (
-                  <div className="mt-3 p-3 rounded-xl border border-amber-500/20 bg-amber-500/10 text-[11px] text-amber-100 leading-relaxed">
-                    {uploadError}
+                <div className="flex-1 grid grid-cols-2 gap-4 w-full">
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <label className="block text-sm font-semibold text-white/60">Kitap Adı</label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(event) => setFormData((previous) => ({ ...previous, title: event.target.value }))}
+                      className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
+                      placeholder="Örn: Suç ve Ceza"
+                    />
                   </div>
-                )}
+
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <label className="block text-sm font-semibold text-white/60">Yazar</label>
+                    <input
+                      type="text"
+                      value={formData.author}
+                      onChange={(event) => setFormData((previous) => ({ ...previous, author: event.target.value }))}
+                      className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
+                      placeholder="Örn: Fyodor Dostoyevski"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-white/60">Sayfa Sayısı</label>
+                    <input
+                      type="number"
+                      value={formData.pageCount || ''}
+                      onChange={(event) =>
+                        setFormData((previous) => ({
+                          ...previous,
+                          pageCount: parseInt(event.target.value, 10) || 0,
+                        }))
+                      }
+                      className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-white/60">Tür</label>
+                    <input
+                      type="text"
+                      value={formData.genre}
+                      onChange={(event) => setFormData((previous) => ({ ...previous, genre: event.target.value }))}
+                      className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
+                      placeholder="Örn: Klasik, Bilim Kurgu"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="flex-1 grid md:grid-cols-2 gap-6 w-full">
-                <div className="space-y-2 col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-white/60">Kitap Adı</label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(event) => setFormData((previous) => ({ ...previous, title: event.target.value }))}
-                    className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
-                    placeholder="Örn: Suç ve Ceza"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-white/60">Yazar</label>
-                  <input
-                    type="text"
-                    value={formData.author}
-                    onChange={(event) => setFormData((previous) => ({ ...previous, author: event.target.value }))}
-                    className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
-                    placeholder="Örn: Fyodor Dostoyevski"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-white/60">Sayfa Sayısı</label>
-                  <input
-                    type="number"
-                    value={formData.pageCount || ''}
-                    onChange={(event) =>
-                      setFormData((previous) => ({
-                        ...previous,
-                        pageCount: parseInt(event.target.value, 10) || 0,
-                      }))
-                    }
-                    className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
-                    placeholder="0"
-                  />
-                </div>
-
+              {/* Durum + Puan row */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-white/60">Durum</label>
                   <select
@@ -603,17 +616,6 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-white/60">Tür</label>
-                  <input
-                    type="text"
-                    value={formData.genre}
-                    onChange={(event) => setFormData((previous) => ({ ...previous, genre: event.target.value }))}
-                    className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
-                    placeholder="Örn: Klasik, Bilim Kurgu"
-                  />
-                </div>
-
-                <div className="space-y-2">
                   <label className="block text-sm font-semibold text-white/60 font-black text-[10px] uppercase tracking-widest">
                     Kişisel Puanım
                   </label>
@@ -632,88 +634,72 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
         {activeTab === 1 && (
           <div className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-4">
-                <h3 className="font-serif font-bold text-white flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.5)]" />
-                  Başlangıç
-                </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-2 align-middle" />
+                  Başlangıç Tarihi
+                </label>
+                <input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(event) => setFormData((previous) => ({ ...previous, startDate: event.target.value }))}
+                  className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
+                />
+              </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">
-                      Tarih
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(event) => setFormData((previous) => ({ ...previous, startDate: event.target.value }))}
-                      className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
-                    />
-                  </div>
-
-                  <div className="relative">
-                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">
-                      Yer / Konum
-                    </label>
-                    <div className="relative">
-                      <MapPin size={14} className="absolute left-3.5 top-3.5 text-white/20" />
-                      <input
-                        type="text"
-                        value={formData.startLocation}
-                        onChange={(event) =>
-                          setFormData((previous) => ({ ...previous, startLocation: event.target.value }))
-                        }
-                        onFocus={() => setActiveSuggestionField('startLocation')}
-                        onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
-                        className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
-                        placeholder="Örn: İstanbul, Ev"
-                      />
-                      {renderAutocomplete('startLocation', formData.startLocation)}
-                    </div>
-                  </div>
+              <div className="space-y-2 relative">
+                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">
+                  Başlangıç Yeri
+                </label>
+                <div className="relative">
+                  <MapPin size={14} className="absolute left-3.5 top-3.5 text-white/20" />
+                  <input
+                    type="text"
+                    value={formData.startLocation}
+                    onChange={(event) =>
+                      setFormData((previous) => ({ ...previous, startLocation: event.target.value }))
+                    }
+                    onFocus={() => setActiveSuggestionField('startLocation')}
+                    onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
+                    className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
+                    placeholder="Örn: İstanbul, Ev"
+                  />
+                  {renderAutocomplete('startLocation', formData.startLocation)}
                 </div>
               </div>
 
-              <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-4">
-                <h3 className="font-serif font-bold text-white flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]" />
-                  Bitiş
-                </h3>
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-2 align-middle" />
+                  Bitiş Tarihi
+                </label>
+                <input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(event) => setFormData((previous) => ({ ...previous, endDate: event.target.value }))}
+                  className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
+                />
+              </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">
-                      Tarih
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(event) => setFormData((previous) => ({ ...previous, endDate: event.target.value }))}
-                      className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
-                    />
-                  </div>
-
-                  <div className="relative">
-                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">
-                      Yer / Konum
-                    </label>
-                    <div className="relative">
-                      <MapPin size={14} className="absolute left-3.5 top-3.5 text-white/20" />
-                      <input
-                        type="text"
-                        value={formData.endLocation}
-                        onChange={(event) =>
-                          setFormData((previous) => ({ ...previous, endLocation: event.target.value }))
-                        }
-                        onFocus={() => setActiveSuggestionField('endLocation')}
-                        onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
-                        className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
-                        placeholder="Örn: İzmir, Tatil"
-                      />
-                      {renderAutocomplete('endLocation', formData.endLocation)}
-                    </div>
-                  </div>
+              <div className="space-y-2 relative">
+                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">
+                  Bitiş Yeri
+                </label>
+                <div className="relative">
+                  <MapPin size={14} className="absolute left-3.5 top-3.5 text-white/20" />
+                  <input
+                    type="text"
+                    value={formData.endLocation}
+                    onChange={(event) =>
+                      setFormData((previous) => ({ ...previous, endLocation: event.target.value }))
+                    }
+                    onFocus={() => setActiveSuggestionField('endLocation')}
+                    onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
+                    className="w-full pl-10 p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:outline-none focus:border-white/20 text-sm transition-all"
+                    placeholder="Örn: İzmir, Tatil"
+                  />
+                  {renderAutocomplete('endLocation', formData.endLocation)}
                 </div>
               </div>
             </div>

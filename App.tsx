@@ -211,21 +211,32 @@ const App: React.FC = () => {
         userEmail={session.user.email}
         activeFilter={filter}
         onFilterChange={setFilter}
+        onNavigateHome={() => {
+          setView('LIST');
+          setSelectedBook(null);
+        }}
       />
 
       <nav className="border-b border-white/5 sticky top-0 z-50 bg-black/20 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex items-center cursor-pointer group" onClick={() => setSidebarOpen(true)}>
-              <div className="bg-white/10 p-2 rounded-lg mr-3 group-hover:bg-white/20 group-hover:scale-110 transition-all backdrop-blur-sm border border-white/10">
+            <div className="flex items-center gap-3">
+              <button className="bg-white/10 p-2 rounded-lg hover:bg-white/20 hover:scale-110 transition-all backdrop-blur-sm border border-white/10" onClick={() => setSidebarOpen(true)}>
                 <Library className="text-white" size={20} />
-              </div>
-              <div>
-                <h1 className="text-xl font-serif font-bold text-white tracking-tight">Kitaplığım</h1>
+              </button>
+              <button
+                className="text-left group"
+                onClick={() => {
+                  setView('LIST');
+                  setSelectedBook(null);
+                  setFilter('ALL');
+                }}
+              >
+                <h1 className="text-xl font-serif font-bold text-white tracking-tight group-hover:text-white/80 transition-colors">Kitaplığım</h1>
                 <p className="text-[10px] text-white/50 uppercase tracking-widest font-semibold flex items-center gap-1">
                   Kişisel Kütüphane <span className="text-[8px] animate-pulse">o</span>
                 </p>
-              </div>
+              </button>
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">

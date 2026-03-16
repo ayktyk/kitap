@@ -9,9 +9,10 @@ interface Props {
   userEmail?: string;
   activeFilter: BookFilter;
   onFilterChange: (filter: BookFilter) => void;
+  onNavigateHome: () => void;
 }
 
-const Sidebar: React.FC<Props> = ({ isOpen, onClose, onSignOut, userEmail, activeFilter, onFilterChange }) => {
+const Sidebar: React.FC<Props> = ({ isOpen, onClose, onSignOut, userEmail, activeFilter, onFilterChange, onNavigateHome }) => {
   const menuItems: Array<{ id: BookFilter; label: string; icon: React.ReactNode }> = [
     { id: 'ALL', label: 'Kitaplığım', icon: <Library size={18} /> },
     { id: 'FAVORITES', label: 'Favorilerim', icon: <Star size={18} className="text-blue-400 fill-blue-400/20" /> },
@@ -64,6 +65,7 @@ const Sidebar: React.FC<Props> = ({ isOpen, onClose, onSignOut, userEmail, activ
                 key={item.id}
                 onClick={() => {
                   onFilterChange(item.id);
+                  onNavigateHome();
                   onClose();
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
