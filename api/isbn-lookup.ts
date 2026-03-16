@@ -161,6 +161,6 @@ export default async function handler(request: any, response: any) {
     response.status(200).json(merged);
   } catch (error) {
     console.error('ISBN lookup failed:', error);
-    response.status(500).json({ error: 'ISBN sorgusu sirasinda hata olustu.' });
+    response.status(500).json({ error: 'ISBN sorgusu sırasında hata oluştu.' });
   }
 }

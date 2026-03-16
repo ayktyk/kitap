@@ -2,10 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import {
   ArrowUpDown,
-  BookOpen,
-  CheckCircle2,
-  Clock3,
-  Heart,
   Library,
   Plus,
   Search,
@@ -29,20 +25,20 @@ type SortOption =
   | 'PAGES_DESC';
 
 const filterLabels: Record<BookFilter, string> = {
-  ALL: 'Kitapligim',
-  FAVORITES: 'Favori Kitaplarim',
-  READING: 'Su An Okuduklarim',
+  ALL: 'Kitaplığım',
+  FAVORITES: 'Favori Kitaplarım',
+  READING: 'Şu An Okuduklarım',
   WANT_TO_READ: 'Okunacaklar',
-  READ: 'Bitirdigim Kitaplar',
-  ABANDONED: 'Yarim Biraktiklarim',
+  READ: 'Bitirdiğim Kitaplar',
+  ABANDONED: 'Yarım Bıraktıklarım',
 };
 
 const sortLabels: Record<SortOption, string> = {
   NEWEST: 'En yeni eklenen',
-  TITLE_ASC: 'Ada gore',
-  AUTHOR_ASC: 'Yazara gore',
-  RATING_DESC: 'Puana gore',
-  PAGES_DESC: 'Sayfa sayisina gore',
+  TITLE_ASC: 'Ada göre',
+  AUTHOR_ASC: 'Yazara göre',
+  RATING_DESC: 'Puana göre',
+  PAGES_DESC: 'Sayfa sayısına göre',
 };
 
 const App: React.FC = () => {
@@ -93,7 +89,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteBook = async (id: string) => {
-    if (window.confirm('Bu kitabi silmek istediginize emin misiniz?')) {
+    if (window.confirm('Bu kitabı silmek istediğinize emin misiniz?')) {
       await supabaseService.deleteBook(id);
       await loadBooks();
       setView('LIST');
@@ -192,11 +188,11 @@ const App: React.FC = () => {
   const visibleCompleted = visibleBooks.filter((book) => book.status === 'READ').length;
 
   const emptyTitle = searchTerm.trim()
-    ? 'Aradigin ifadeye uygun kitap bulunamadi'
-    : 'Kutuphaneniz Henuz Sessiz';
+    ? 'Aradığın ifadeye uygun kitap bulunamadı'
+    : 'Kütüphaneniz Henüz Sessiz';
   const emptyDescription = searchTerm.trim()
-    ? 'Arama kelimesini degistirerek veya filtreyi temizleyerek tekrar deneyebilirsiniz.'
-    : 'Yeni bir kitap ekleyerek kutuphanenizi canlandirin. Sag ustteki butonla baslayabilirsiniz.';
+    ? 'Arama kelimesini değiştirerek veya filtreyi temizleyerek tekrar deneyebilirsiniz.'
+    : 'Yeni bir kitap ekleyerek kütüphanenizi canlandırın. Sağ üstteki butonla başlayabilirsiniz.';
 
   return (
     <div className="min-h-screen relative font-sans">
@@ -225,9 +221,9 @@ const App: React.FC = () => {
                 <Library className="text-white" size={20} />
               </div>
               <div>
-                <h1 className="text-xl font-serif font-bold text-white tracking-tight">Kitapligim</h1>
+                <h1 className="text-xl font-serif font-bold text-white tracking-tight">Kitaplığım</h1>
                 <p className="text-[10px] text-white/50 uppercase tracking-widest font-semibold flex items-center gap-1">
-                  Kisisel Kutuphane <span className="text-[8px] animate-pulse">o</span>
+                  Kişisel Kütüphane <span className="text-[8px] animate-pulse">o</span>
                 </p>
               </div>
             </div>
@@ -255,7 +251,7 @@ const App: React.FC = () => {
                       }`}
                     >
                       {option === 'ALL'
-                        ? 'Tumu'
+                        ? 'Tümü'
                         : option === 'FAVORITES'
                           ? 'Favoriler'
                           : option === 'READING'
@@ -293,9 +289,6 @@ const App: React.FC = () => {
                 <h2 className="text-4xl font-bold text-white font-serif tracking-tight">
                   {filterLabels[filter]}
                 </h2>
-                <p className="text-xs text-white/30 mt-2 font-medium tracking-wide uppercase">
-                  {visibleBooks.length} Kitap • {visiblePageCount.toLocaleString()} Sayfa
-                </p>
               </div>
 
               <div className="lg:hidden flex bg-white/5 p-1.5 rounded-2xl w-full overflow-x-auto no-scrollbar border border-white/5 backdrop-blur-sm">
@@ -310,7 +303,7 @@ const App: React.FC = () => {
                     }`}
                   >
                     {option === 'ALL'
-                      ? 'Tumu'
+                      ? 'Tümü'
                       : option === 'FAVORITES'
                         ? 'Favori'
                         : option === 'READING'
@@ -323,51 +316,22 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <section className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/35">
-                    Gorunen
-                  </span>
-                  <BookOpen size={16} className="text-white/35" />
-                </div>
-                <p className="text-3xl font-serif font-bold text-white">{visibleBooks.length}</p>
-                <p className="text-xs text-white/35 mt-2">Anlik liste sonucu</p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/35">
-                    Okunuyor
-                  </span>
-                  <Clock3 size={16} className="text-green-300/70" />
-                </div>
-                <p className="text-3xl font-serif font-bold text-white">{visibleReading}</p>
-                <p className="text-xs text-white/35 mt-2">Aktif okuma sayisi</p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/35">
-                    Tamamlandi
-                  </span>
-                  <CheckCircle2 size={16} className="text-blue-300/70" />
-                </div>
-                <p className="text-3xl font-serif font-bold text-white">{visibleCompleted}</p>
-                <p className="text-xs text-white/35 mt-2">Bitirilen kitaplar</p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/35">
-                    Favoriler
-                  </span>
-                  <Heart size={16} className="text-pink-300/70" />
-                </div>
-                <p className="text-3xl font-serif font-bold text-white">{visibleFavorites}</p>
-                <p className="text-xs text-white/35 mt-2">Kalp attigin secimler</p>
-              </div>
-            </section>
+            <div className="flex items-center gap-6 mb-8 text-sm text-white/40 flex-wrap">
+              <span className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.4)]" />
+                <span className="font-medium text-white/50">{visibleReading}</span> okuyor
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.4)]" />
+                <span className="font-medium text-white/50">{visibleCompleted}</span> bitti
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-pink-400 shadow-[0_0_6px_rgba(244,114,182,0.4)]" />
+                <span className="font-medium text-white/50">{visibleFavorites}</span> favori
+              </span>
+              <span className="text-white/15 hidden sm:inline">|</span>
+              <span className="hidden sm:inline text-white/25">{visiblePageCount.toLocaleString()} sayfa okundu</span>
+            </div>
 
             <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-5">
               <div className="flex flex-col lg:flex-row gap-4">
@@ -381,7 +345,7 @@ const App: React.FC = () => {
                       type="text"
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder="Kitap, yazar, tur, alinti veya not ara"
+                      placeholder="Kitap, yazar, tür, alıntı veya not ara"
                       className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-white/10 bg-black/20 text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-white/15 focus:border-transparent transition-all"
                     />
                   </div>
@@ -389,7 +353,7 @@ const App: React.FC = () => {
 
                 <div className="lg:w-72">
                   <label className="block text-[10px] font-black uppercase tracking-[0.25em] text-white/35 mb-2">
-                    Siralama
+                    Sıralama
                   </label>
                   <div className="relative">
                     <ArrowUpDown size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
@@ -411,8 +375,8 @@ const App: React.FC = () => {
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-white/35">
                 <p>
                   {searchTerm.trim()
-                    ? `"${searchTerm}" icin ${visibleBooks.length} sonuc bulundu.`
-                    : 'Filtrelerini daraltmak veya yazara gore aramak icin ustteki alanlari kullan.'}
+                    ? `"${searchTerm}" için ${visibleBooks.length} sonuç bulundu.`
+                    : 'Filtrelerini daraltmak veya yazara göre aramak için üstteki alanları kullan.'}
                 </p>
                 {(searchTerm || sortBy !== 'NEWEST') && (
                   <button
@@ -423,7 +387,7 @@ const App: React.FC = () => {
                     }}
                     className="text-left sm:text-right font-semibold text-white/55 hover:text-white transition-colors"
                   >
-                    Arama ve siralamayi sifirla
+                    Arama ve sıralamayı sıfırla
                   </button>
                 )}
               </div>

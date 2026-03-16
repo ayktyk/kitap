@@ -13,7 +13,7 @@ export const lookupBookByIsbn = async (rawValue: string): Promise<BookLookupResu
 
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => null);
-    throw new Error(errorPayload?.error || 'ISBN bilgisi alinamadi.');
+    throw new Error(errorPayload?.error || 'ISBN bilgisi alınamadı.');
   }
 
   return response.json();

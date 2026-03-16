@@ -15,7 +15,7 @@ const Sidebar: React.FC<Props> = ({ isOpen, onClose, onSignOut, userEmail, activ
   const menuItems: Array<{ id: BookFilter; label: string; icon: React.ReactNode }> = [
     { id: 'ALL', label: 'Kitaplığım', icon: <Library size={18} /> },
     { id: 'FAVORITES', label: 'Favorilerim', icon: <Star size={18} className="text-blue-400 fill-blue-400/20" /> },
-    { id: 'READING', label: 'Su An Okunanlar', icon: <Clock size={18} /> },
+    { id: 'READING', label: 'Şu An Okunanlar', icon: <Clock size={18} /> },
     { id: 'WANT_TO_READ', label: 'Okunacaklar', icon: <Bookmark size={18} /> },
     { id: 'READ', label: 'Bitirdiklerim', icon: <Calendar size={18} /> },
   ];

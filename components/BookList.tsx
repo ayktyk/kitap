@@ -15,8 +15,8 @@ const BookList: React.FC<Props> = ({
   books,
   onSelect,
   onEdit,
-  emptyTitle = 'Kutuphaneniz Henuz Sessiz',
-  emptyDescription = 'Yeni bir kitap ekleyerek kutuphanenizi canlandirin. Sag ustteki butonla baslayabilirsiniz.',
+  emptyTitle = 'Kütüphaneniz Henüz Sessiz',
+  emptyDescription = 'Yeni bir kitap ekleyerek kütüphanenizi canlandırın. Sağ üstteki butonla başlayabilirsiniz.',
 }) => {
   if (books.length === 0) {
     return (
