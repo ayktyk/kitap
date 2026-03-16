@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Book } from '../types';
-import { ArrowLeft, Calendar, MapPin, Quote, Clock, BookOpen, ShoppingBag, BrainCircuit } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Quote, Clock, BookOpen, ShoppingBag } from 'lucide-react';
 import RatingStars from './RatingStars';
-import { analyzeThoughts } from '../services/geminiService';
 
 interface Props {
   book: Book;
@@ -11,16 +10,6 @@ interface Props {
 }
 
 const BookDetails: React.FC<Props> = ({ book, onBack, onEdit }) => {
-  const [aiComment, setAiComment] = useState<string>('');
-  const [analyzing, setAnalyzing] = useState(false);
-
-  const handleAnalyze = async () => {
-    setAnalyzing(true);
-    const comment = await analyzeThoughts(book.thoughts, book.title);
-    setAiComment(comment);
-    setAnalyzing(false);
-  };
-
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'Belirtilmedi';
     return new Date(dateStr).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -126,74 +115,44 @@ const BookDetails: React.FC<Props> = ({ book, onBack, onEdit }) => {
         </section>
 
         {/* Thoughts */}
-        <section className="mb-14">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Düşüncelerim</h3>
-            {book.thoughts && !aiComment && (
-              <button
-                onClick={handleAnalyze}
-                disabled={analyzing}
-                className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-white/40 hover:text-white transition-all bg-white/5 px-4 py-2 rounded-full border border-white/5"
-              >
-                <BrainCircuit size={14} />
-                {analyzing ? 'Analiz ediliyor...' : 'Yapay Zeka Yorumlasın'}
-              </button>
-            )}
-          </div>
-
-          {book.thoughts ? (
+        {book.thoughts && (
+          <section className="mb-14">
+            <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-8">Düşüncelerim</h3>
             <div className="relative bg-white/[0.03] p-8 md:p-10 rounded-3xl border border-white/5 shadow-inner">
               <Quote className="absolute top-6 left-6 text-white/[0.04] -rotate-12" size={60} />
               <p className="relative font-serif text-lg text-white/80 italic leading-[1.9] tracking-tight whitespace-pre-wrap z-10">
                 {book.thoughts}
               </p>
             </div>
-          ) : (
-            <p className="text-white/20 text-sm italic font-serif py-12 text-center border-2 border-dashed border-white/5 rounded-3xl">
-              Henüz bir düşünce tohumu serpilmemiş.
-            </p>
-          )}
-
-          {aiComment && (
-            <div className="mt-8 bg-gradient-to-r from-white/[0.05] to-transparent p-6 rounded-3xl border-l-[6px] border-white/20 animate-in fade-in slide-in-from-top-4 duration-700">
-              <div className="flex items-center gap-3 text-white/40 font-black text-[10px] uppercase tracking-[0.25em] mb-3">
-                <BrainCircuit size={16} className="text-white/60" />
-                <span>AI Kütüphaneci Fısıltısı</span>
-              </div>
-              <p className="text-base text-white/70 italic leading-relaxed font-serif">"{aiComment}"</p>
-            </div>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* Quotes */}
-        <section className="mb-14">
-          <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-8">
-            Altını Çizdiklerim <span className="text-white/10 ml-1">({book.quotes.length})</span>
-          </h3>
-          <div className="grid gap-6">
-            {book.quotes.map((quote) => (
-              <div
-                key={quote.id}
-                className="relative bg-white/[0.03] p-8 rounded-3xl border border-white/5 shadow-xl hover:bg-white/[0.06] transition-all duration-500 group"
-              >
-                <Quote className="absolute -top-4 -left-2 text-white/[0.04] -rotate-12" size={80} />
-                <p className="relative text-white/90 font-serif italic text-lg z-10 pl-4 leading-[1.9] tracking-tight group-hover:translate-x-1 transition-transform">
-                  "{quote.text}"
-                </p>
-                {quote.page && quote.page > 0 && (
-                  <div className="text-right mt-6 text-[10px] font-black uppercase tracking-widest text-white/20">
-                    — Sayfa {quote.page}
-                  </div>
-                )}
-              </div>
-            ))}
-            {book.quotes.length === 0 && (
-              <p className="text-white/20 text-sm italic font-serif py-12 text-center border-2 border-dashed border-white/5 rounded-3xl">
-                Satırlar henüz sessiz bekliyor...
-              </p>
-            )}
-          </div>
-        </section>
+        {book.quotes.length > 0 && (
+          <section className="mb-14">
+            <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-8">
+              Altını Çizdiklerim <span className="text-white/10 ml-1">({book.quotes.length})</span>
+            </h3>
+            <div className="grid gap-6">
+              {book.quotes.map((quote) => (
+                <div
+                  key={quote.id}
+                  className="relative bg-white/[0.03] p-8 rounded-3xl border border-white/5 shadow-xl hover:bg-white/[0.06] transition-all duration-500 group"
+                >
+                  <Quote className="absolute -top-4 -left-2 text-white/[0.04] -rotate-12" size={80} />
+                  <p className="relative text-white/90 font-serif italic text-lg z-10 pl-4 leading-[1.9] tracking-tight group-hover:translate-x-1 transition-transform">
+                    "{quote.text}"
+                  </p>
+                  {quote.page && quote.page > 0 && (
+                    <div className="text-right mt-6 text-[10px] font-black uppercase tracking-widest text-white/20">
+                      — Sayfa {quote.page}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Acquisition details — inline compact */}
         {(book.purchaseDate || book.purchaseLocation) && (

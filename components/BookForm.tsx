@@ -770,8 +770,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
               <div className="space-y-4">
                 {formData.quotes.length === 0 && (
-                  <div className="text-center py-12 border-2 border-dashed border-white/5 rounded-2xl text-white/20 text-sm font-serif italic">
-                    Henüz hiçbir alıntı eklenmedi.
+                  <div className="text-center py-12 border-2 border-dashed border-white/5 rounded-2xl text-white/15 text-sm">
                   </div>
                 )}
 
