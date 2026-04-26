@@ -48,6 +48,7 @@ const AppContent: React.FC = () => {
   const isDarkTheme = theme === 'karanlik';
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
   const [view, setView] = useState<ViewState>('LIST');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -65,8 +66,11 @@ const AppContent: React.FC = () => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -126,7 +130,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (!session) {
+  if (!session || recoveryMode) {
     return (
       <>
         <div className="fixed inset-0 -z-10" style={{ backgroundColor: 'var(--theme-bg)' }}>
@@ -138,7 +142,10 @@ const AppContent: React.FC = () => {
             />
           )}
         </div>
-        <Auth />
+        <Auth
+          initialMode={recoveryMode ? 'reset' : 'login'}
+          onPasswordReset={() => setRecoveryMode(false)}
+        />
         <ThemeSwitcher isOpen={themeSwitcherOpen} onClose={() => setThemeSwitcherOpen(false)} />
         {/* Auth ekraninda da tema degistirme dugmesi */}
         <button
