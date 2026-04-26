@@ -176,10 +176,13 @@ export const importBooks = async (
   if (!user) throw new Error('Önce giriş yapmanız gerekir.');
 
   const existingBooks = await getBooks();
-  const existingIds = new Set(existingBooks.map((b) => b.id));
-  const existingTitleAuthor = new Set(
-    existingBooks.map((b) => `${b.title.trim().toLowerCase()}|${b.author.trim().toLowerCase()}`),
-  );
+  const existingByTitleAuthor = new Map<string, Book>();
+  for (const book of existingBooks) {
+    const key = `${book.title.trim().toLowerCase()}|${book.author.trim().toLowerCase()}`;
+    if (key !== '|') {
+      existingByTitleAuthor.set(key, book);
+    }
+  }
 
   const summary: ImportSummary = {
     total: bundle.books.length,
@@ -189,35 +192,52 @@ export const importBooks = async (
     errors: [],
   };
 
+  const extractErrorMessage = (err: unknown): string => {
+    if (!err) return 'Bilinmeyen hata';
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'object') {
+      const e = err as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+      const parts = [e.message, e.details, e.hint, e.code]
+        .filter((v) => v !== undefined && v !== null && v !== '')
+        .map((v) => String(v));
+      if (parts.length > 0) return parts.join(' — ');
+    }
+    return String(err);
+  };
+
   for (const incoming of bundle.books) {
     try {
       const titleAuthorKey = `${(incoming.title || '').trim().toLowerCase()}|${(incoming.author || '').trim().toLowerCase()}`;
-      const idConflict = existingIds.has(incoming.id);
-      const contentConflict = titleAuthorKey !== '|' && existingTitleAuthor.has(titleAuthorKey);
+      const existingMatch = titleAuthorKey !== '|' ? existingByTitleAuthor.get(titleAuthorKey) : undefined;
 
-      if ((idConflict || contentConflict) && options.conflictMode === 'skip') {
+      if (existingMatch && options.conflictMode === 'skip') {
         summary.skipped += 1;
         continue;
       }
 
-      let bookToSave: Book = { ...incoming };
+      // Always regenerate IDs to avoid colliding with rows owned by another user
+      // (cross-account imports hit Supabase RLS otherwise — the upsert tries to
+      // UPDATE the old account's row and gets blocked silently).
+      const newId =
+        existingMatch && options.conflictMode === 'overwrite'
+          ? existingMatch.id
+          : crypto.randomUUID();
 
-      if (options.conflictMode === 'duplicate' || idConflict) {
-        bookToSave = {
-          ...bookToSave,
+      const bookToSave: Book = {
+        ...incoming,
+        id: newId,
+        quotes: (incoming.quotes || []).map((q) => ({
+          ...q,
           id: crypto.randomUUID(),
-          quotes: (bookToSave.quotes || []).map((q) => ({ ...q, id: crypto.randomUUID() })),
-        };
-      }
+        })),
+      };
 
       await saveBook(bookToSave);
       summary.imported += 1;
-      existingIds.add(bookToSave.id);
-      existingTitleAuthor.add(titleAuthorKey);
+      existingByTitleAuthor.set(titleAuthorKey, bookToSave);
     } catch (err) {
       summary.failed += 1;
-      const message = err instanceof Error ? err.message : String(err);
-      summary.errors.push(`${incoming.title || 'Bilinmeyen kitap'}: ${message}`);
+      summary.errors.push(`${incoming.title || 'Bilinmeyen kitap'}: ${extractErrorMessage(err)}`);
     }
   }
 
