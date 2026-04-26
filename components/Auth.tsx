@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Library, Mail, Lock, UserPlus, LogIn } from 'lucide-react';
+import { Mail, Lock, UserPlus, LogIn } from 'lucide-react';
+import Logo from './Logo';
 
 const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -40,9 +41,7 @@ const Auth: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
       <div className="w-full max-w-md p-8 glass rounded-2xl border border-white/10 shadow-2xl relative z-10 backdrop-blur-3xl bg-black/40">
         <div className="flex justify-center mb-8">
-          <div className="bg-white/10 p-4 rounded-2xl border border-white/10 shadow-inner">
-            <Library className="text-white" size={48} />
-          </div>
+          <Logo size={88} className="rounded-2xl shadow-2xl" />
         </div>
 
         <div className="text-center mb-10">

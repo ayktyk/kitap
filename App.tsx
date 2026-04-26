@@ -2,20 +2,22 @@ import React, { useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import {
   ArrowUpDown,
-  Library,
   Plus,
   Search,
   User,
 } from 'lucide-react';
+import Logo from './components/Logo';
 import { MeshGradient } from '@paper-design/shaders-react';
 import BookDetails from './components/BookDetails';
 import BookForm from './components/BookForm';
 import BookList from './components/BookList';
 import Auth from './components/Auth';
 import Sidebar from './components/Sidebar';
+import ThemeSwitcher from './components/ThemeSwitcher';
 import { supabase } from './lib/supabase';
 import * as supabaseService from './services/supabaseService';
 import { Book, BookFilter, ViewState } from './types';
+import { ThemeProvider, useTheme } from './lib/themeContext';
 
 type SortOption =
   | 'NEWEST'
@@ -41,7 +43,9 @@ const sortLabels: Record<SortOption, string> = {
   PAGES_DESC: 'Sayfa sayısına göre',
 };
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { theme } = useTheme();
+  const isDarkTheme = theme === 'karanlik';
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [books, setBooks] = useState<Book[]>([]);
@@ -49,6 +53,7 @@ const App: React.FC = () => {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [filter, setFilter] = useState<BookFilter>('ALL');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [themeSwitcherOpen, setThemeSwitcherOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('NEWEST');
 
@@ -115,8 +120,8 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--theme-bg)' }}>
+        <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: 'var(--theme-border)', borderTopColor: 'var(--theme-ink)' }} />
       </div>
     );
   }
@@ -124,14 +129,30 @@ const App: React.FC = () => {
   if (!session) {
     return (
       <>
-        <div className="fixed inset-0 -z-10 bg-black">
-          <MeshGradient
-            className="w-full h-full opacity-40"
-            colors={['#101010', '#1a1a1a', '#2a2a2a', '#010101']}
-            speed={0.8}
-          />
+        <div className="fixed inset-0 -z-10" style={{ backgroundColor: 'var(--theme-bg)' }}>
+          {isDarkTheme && (
+            <MeshGradient
+              className="w-full h-full opacity-40"
+              colors={['#101010', '#1a1a1a', '#2a2a2a', '#010101']}
+              speed={0.8}
+            />
+          )}
         </div>
         <Auth />
+        <ThemeSwitcher isOpen={themeSwitcherOpen} onClose={() => setThemeSwitcherOpen(false)} />
+        {/* Auth ekraninda da tema degistirme dugmesi */}
+        <button
+          type="button"
+          onClick={() => setThemeSwitcherOpen(true)}
+          className="fixed top-5 right-5 z-50 px-3.5 py-2 rounded-full border text-[11px] font-bold uppercase tracking-[0.18em] transition-all hover:scale-105 active:scale-95 backdrop-blur-md"
+          style={{
+            backgroundColor: 'var(--theme-surface)',
+            borderColor: 'var(--theme-border)',
+            color: 'var(--theme-ink-soft)',
+          }}
+        >
+          Tema
+        </button>
       </>
     );
   }
@@ -196,12 +217,14 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen relative font-sans">
-      <div className="fixed inset-0 -z-10 bg-black">
-        <MeshGradient
-          className="w-full h-full opacity-40"
-          colors={['#101010', '#1a1a1a', '#2a2a2a', '#010101']}
-          speed={0.8}
-        />
+      <div className="fixed inset-0 -z-10" style={{ backgroundColor: 'var(--theme-bg)' }}>
+        {isDarkTheme && (
+          <MeshGradient
+            className="w-full h-full opacity-40"
+            colors={['#101010', '#1a1a1a', '#2a2a2a', '#010101']}
+            speed={0.8}
+          />
+        )}
       </div>
 
       <Sidebar
@@ -215,14 +238,21 @@ const App: React.FC = () => {
           setView('LIST');
           setSelectedBook(null);
         }}
+        onOpenThemeSwitcher={() => setThemeSwitcherOpen(true)}
       />
+
+      <ThemeSwitcher isOpen={themeSwitcherOpen} onClose={() => setThemeSwitcherOpen(false)} />
 
       <nav className="border-b border-white/5 sticky top-0 z-50 bg-black/20 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-3">
-              <button className="bg-white/10 p-2 rounded-lg hover:bg-white/20 hover:scale-110 transition-all backdrop-blur-sm border border-white/10" onClick={() => setSidebarOpen(true)}>
-                <Library className="text-white" size={20} />
+              <button
+                className="p-1 rounded-lg hover:scale-110 transition-all overflow-hidden"
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Menüyü aç"
+              >
+                <Logo size={36} className="rounded-md" />
               </button>
               <button
                 className="text-left group"
@@ -443,5 +473,11 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const App: React.FC = () => (
+  <ThemeProvider>
+    <AppContent />
+  </ThemeProvider>
+);
 
 export default App;

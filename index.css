@@ -3,48 +3,255 @@
 @theme inline {
   --font-geist-sans: "Inter", sans-serif;
   --font-geist-mono: "Courier New", monospace;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  
+  --font-sans: var(--theme-font-sans);
+  --font-serif: var(--theme-font-serif);
+  --font-mono: var(--theme-font-mono);
+
   --color-destructive-foreground: var(--destructive-foreground);
-  
+
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
   --radius-lg: 1rem;
+
+  /* Tailwind v4 — bu iki tokeni override ederek text-white / bg-white / bg-black
+     gibi siniflar tum temalarda otomatik takip eder. */
+  --color-white: var(--theme-ink);
+  --color-black: var(--theme-bg);
 }
 
-:root {
-  --background: oklch(0.1 0 0); /* Dark */
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(1 0 0 / 0.05);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.1 0 0 / 0.9);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(1 0 0 / 0.1);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(1 0 0 / 0.05);
-  --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(1 0 0 / 0.05);
-  --muted-foreground: oklch(0.7 0 0);
-  --accent: oklch(1 0 0 / 0.15);
-  --accent-foreground: oklch(1 0 0);
-  --border: oklch(1 0 0 / 0.1);
-  --input: oklch(1 0 0 / 0.05);
-  --ring: oklch(1 0 0 / 0.3);
+/* =====================================================================
+   TEMA SISTEMI — 6 tema (Karanlik default + 5 yeni)
+   Tum CSS variable'lar kok elementte tutulur, [data-theme="..."] ile override.
+   ===================================================================== */
+
+:root,
+[data-theme="karanlik"] {
+  /* === Karanlik (mevcut tema) === */
+  --theme-bg: #000000;
+  --theme-bg-2: #0a0a0a;
+  --theme-surface: rgba(255, 255, 255, 0.05);
+  --theme-surface-2: rgba(255, 255, 255, 0.08);
+  --theme-ink: #ffffff;
+  --theme-ink-soft: rgba(255, 255, 255, 0.7);
+  --theme-ink-mute: rgba(255, 255, 255, 0.4);
+  --theme-border: rgba(255, 255, 255, 0.1);
+  --theme-border-soft: rgba(255, 255, 255, 0.05);
+  --theme-accent: #60a5fa;          /* mavi */
+  --theme-accent-2: #4ade80;        /* yesil */
+  --theme-accent-warm: #f4a261;
+  --theme-favorite: #f472b6;        /* pembe */
+  --theme-rating: #facc15;          /* sari yildiz */
+  --theme-danger: #ef4444;
+
+  --theme-font-sans: "Inter", system-ui, sans-serif;
+  --theme-font-serif: "Merriweather", Georgia, serif;
+  --theme-font-display: "Merriweather", Georgia, serif;
+  --theme-font-mono: "Courier New", monospace;
+  --theme-font-script: "Caveat", cursive;
+
+  --theme-radius-card: 1rem;
+  --theme-shadow-card: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+
+  --background: var(--theme-bg);
+  --foreground: var(--theme-ink);
+  --card: var(--theme-surface);
+  --card-foreground: var(--theme-ink);
+  --popover: rgba(0, 0, 0, 0.9);
+  --popover-foreground: var(--theme-ink);
+  --primary: rgba(255, 255, 255, 0.1);
+  --primary-foreground: #ffffff;
+  --secondary: var(--theme-surface);
+  --secondary-foreground: var(--theme-ink);
+  --muted: var(--theme-surface);
+  --muted-foreground: var(--theme-ink-soft);
+  --accent: var(--theme-surface-2);
+  --accent-foreground: var(--theme-ink);
+  --border: var(--theme-border);
+  --input: var(--theme-surface);
+  --ring: rgba(255, 255, 255, 0.3);
 }
 
-body {
-  background-color: black;
-  color: white;
-  font-family: var(--font-sans);
+[data-theme="muzehher"] {
+  /* === Muzehher — Klasik Kutuphane === */
+  --theme-bg: #ece1cd;
+  --theme-bg-2: #f4ead6;
+  --theme-surface: rgba(168, 122, 58, 0.07);
+  --theme-surface-2: rgba(168, 122, 58, 0.14);
+  --theme-ink: #2a1d10;
+  --theme-ink-soft: #4a3520;
+  --theme-ink-mute: #7a6647;
+  --theme-border: rgba(42, 29, 16, 0.22);
+  --theme-border-soft: rgba(42, 29, 16, 0.1);
+  --theme-accent: #6b1f24;          /* burgundy */
+  --theme-accent-2: #2f4a3a;        /* deri yesili */
+  --theme-accent-warm: #a87a3a;     /* altin */
+  --theme-favorite: #6b1f24;
+  --theme-rating: #a87a3a;
+  --theme-danger: #8b2a1f;
+
+  --theme-font-sans: "EB Garamond", Georgia, serif;
+  --theme-font-serif: "EB Garamond", Georgia, serif;
+  --theme-font-display: "Cormorant Garamond", Georgia, serif;
+  --theme-font-mono: "IBM Plex Mono", monospace;
+  --theme-font-script: "Caveat", cursive;
+
+  --theme-radius-card: 0.5rem;
+  --theme-shadow-card: inset 0 0 0 1px rgba(168, 122, 58, 0.3), 0 8px 20px rgba(42, 29, 16, 0.12);
 }
+
+[data-theme="parsomen"] {
+  /* === Parsomen — Eski Yayinevi / Gazete === */
+  --theme-bg: #f1ebe1;
+  --theme-bg-2: #e8e0d0;
+  --theme-surface: rgba(28, 26, 22, 0.04);
+  --theme-surface-2: rgba(28, 26, 22, 0.09);
+  --theme-ink: #1c1a16;
+  --theme-ink-soft: #38332a;
+  --theme-ink-mute: #6e6a5e;
+  --theme-border: rgba(28, 26, 22, 0.55);
+  --theme-border-soft: rgba(28, 26, 22, 0.18);
+  --theme-accent: #a13b2a;          /* manset kirmizisi */
+  --theme-accent-2: #8a4a2a;        /* murekkep */
+  --theme-accent-warm: #8a4a2a;
+  --theme-favorite: #a13b2a;
+  --theme-rating: #1c1a16;
+  --theme-danger: #a13b2a;
+
+  --theme-font-sans: "EB Garamond", Georgia, serif;
+  --theme-font-serif: "EB Garamond", Georgia, serif;
+  --theme-font-display: "Playfair Display", "Newsreader", Georgia, serif;
+  --theme-font-mono: "IBM Plex Mono", monospace;
+  --theme-font-script: "IBM Plex Mono", monospace;
+
+  --theme-radius-card: 0;
+  --theme-shadow-card: 0 1px 0 rgba(28, 26, 22, 0.3);
+}
+
+[data-theme="atlas"] {
+  /* === Atlas — Modern Editorial / Galeri === */
+  --theme-bg: #f7f5f0;
+  --theme-bg-2: #ffffff;
+  --theme-surface: rgba(14, 14, 12, 0.03);
+  --theme-surface-2: rgba(14, 14, 12, 0.07);
+  --theme-ink: #0e0e0c;
+  --theme-ink-soft: #2a2925;
+  --theme-ink-mute: #8a877e;
+  --theme-border: rgba(14, 14, 12, 0.12);
+  --theme-border-soft: rgba(14, 14, 12, 0.06);
+  --theme-accent: #c2410c;          /* terracotta */
+  --theme-accent-2: #1e3a2f;        /* derin yesil */
+  --theme-accent-warm: #c2410c;
+  --theme-favorite: #c2410c;
+  --theme-rating: #0e0e0c;
+  --theme-danger: #c2410c;
+
+  --theme-font-sans: "Inter", system-ui, sans-serif;
+  --theme-font-serif: "Fraunces", Georgia, serif;
+  --theme-font-display: "Fraunces", Georgia, serif;
+  --theme-font-mono: "Inter", monospace;
+  --theme-font-script: "Fraunces", Georgia, serif;
+
+  --theme-radius-card: 0.25rem;
+  --theme-shadow-card: none;
+}
+
+[data-theme="sage"] {
+  /* === Sage — Dogal & Yumusak === */
+  --theme-bg: #f0ebde;
+  --theme-bg-2: #f7f3e8;
+  --theme-surface: rgba(107, 125, 99, 0.08);
+  --theme-surface-2: rgba(107, 125, 99, 0.16);
+  --theme-ink: #2c2a22;
+  --theme-ink-soft: #5a554a;
+  --theme-ink-mute: #8a8475;
+  --theme-border: rgba(44, 42, 34, 0.14);
+  --theme-border-soft: rgba(44, 42, 34, 0.07);
+  --theme-accent: #6b7d63;          /* sage */
+  --theme-accent-2: #b87a52;        /* clay */
+  --theme-accent-warm: #c98c8c;     /* rose */
+  --theme-favorite: #c98c8c;
+  --theme-rating: #6b7d63;
+  --theme-danger: #b87a52;
+
+  --theme-font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --theme-font-serif: "EB Garamond", Georgia, serif;
+  --theme-font-display: "Fraunces", Georgia, serif;
+  --theme-font-mono: "IBM Plex Mono", monospace;
+  --theme-font-script: "Caveat", cursive;
+
+  --theme-radius-card: 1.25rem;
+  --theme-shadow-card: 0 8px 30px rgba(44, 42, 34, 0.06);
+}
+
+[data-theme="mehtap"] {
+  /* === Mehtap — Mistik & Siirsel === */
+  --theme-bg: #eaeaf3;
+  --theme-bg-2: #f3f1f9;
+  --theme-surface: rgba(255, 255, 255, 0.45);
+  --theme-surface-2: rgba(255, 255, 255, 0.65);
+  --theme-ink: #1a2347;
+  --theme-ink-soft: #2f3a64;
+  --theme-ink-mute: #6a708a;
+  --theme-border: rgba(26, 35, 71, 0.18);
+  --theme-border-soft: rgba(26, 35, 71, 0.08);
+  --theme-accent: #1a2347;          /* gece murekkebi */
+  --theme-accent-2: #9a7a30;        /* eski altin */
+  --theme-accent-warm: #c9a44a;
+  --theme-favorite: #a4607a;        /* rose */
+  --theme-rating: #9a7a30;
+  --theme-danger: #a4607a;
+
+  --theme-font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --theme-font-serif: "Cormorant Garamond", Georgia, serif;
+  --theme-font-display: "Cormorant Garamond", Georgia, serif;
+  --theme-font-mono: "IBM Plex Mono", monospace;
+  --theme-font-script: "Caveat", cursive;
+
+  --theme-radius-card: 0.875rem;
+  --theme-shadow-card: 0 10px 40px rgba(26, 35, 71, 0.1);
+}
+
+/* ============================================================
+   GLOBAL TIPOGRAFI & GOVDE
+   ============================================================ */
+
+html, body {
+  background-color: var(--theme-bg);
+  color: var(--theme-ink);
+  font-family: var(--theme-font-sans);
+  transition: background-color 280ms ease, color 280ms ease;
+}
+
+h1, h2, h3, h4, .serif, .font-serif {
+  font-family: var(--theme-font-serif);
+}
+
+h1, h2, h3 {
+  font-family: var(--theme-font-display);
+}
+
+/* ============================================================
+   GLASS — tema duyarli yuzey
+   ============================================================ */
 
 .glass {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--theme-surface);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--theme-border-soft);
 }
+
+[data-theme="parsomen"] .glass,
+[data-theme="atlas"] .glass {
+  /* gazete + galeri temalarinda blur azaltilir, sade duzlem */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--theme-bg-2);
+}
+
+/* ============================================================
+   KART HOVER
+   ============================================================ */
 
 .card-hover {
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -52,17 +259,92 @@ body {
 
 .card-hover:hover {
   transform: translateY(-8px) scale(1.02);
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--theme-surface-2);
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--theme-border);
 }
 
-/* Typography refinements */
-h1, h2, h3, .serif {
-  font-family: "Merriweather", serif;
+/* Acik temalarda hover gölgesi yumusak */
+[data-theme="muzehher"] .card-hover:hover,
+[data-theme="parsomen"] .card-hover:hover,
+[data-theme="atlas"] .card-hover:hover,
+[data-theme="sage"] .card-hover:hover,
+[data-theme="mehtap"] .card-hover:hover {
+  box-shadow: var(--theme-shadow-card);
 }
 
-/* Custom Utilities */
+/* ============================================================
+   ACIK TEMALARDA OTOMATIK INVERSIYON
+   Mevcut komponentler text-white, bg-white/X, border-white/X
+   patternini kullaniyor. Tailwind v4'te --color-white tokenini
+   tema basina override ederek bu patternlerin ink rengine
+   donmesini sagliyoruz (yukaridaki @theme bloguna bak).
+   Asagidaki ek kurallar koselerine kadar tutarliligi saglar.
+   ============================================================ */
+
+[data-theme="muzehher"],
+[data-theme="parsomen"],
+[data-theme="atlas"],
+[data-theme="sage"],
+[data-theme="mehtap"] {
+  color-scheme: light;
+}
+
+/* Acik temalarda 'bg-black' / 'bg-zinc-900' / 'bg-zinc-950' alanlari
+   karanlik kalmasin diye temaya gore re-mapliyoruz. */
+[data-theme="muzehher"] .bg-zinc-900,
+[data-theme="muzehher"] .bg-zinc-950,
+[data-theme="parsomen"] .bg-zinc-900,
+[data-theme="parsomen"] .bg-zinc-950,
+[data-theme="atlas"] .bg-zinc-900,
+[data-theme="atlas"] .bg-zinc-950,
+[data-theme="sage"] .bg-zinc-900,
+[data-theme="sage"] .bg-zinc-950,
+[data-theme="mehtap"] .bg-zinc-900,
+[data-theme="mehtap"] .bg-zinc-950 {
+  background-color: var(--theme-bg-2) !important;
+  color: var(--theme-ink);
+}
+
+/* select option arka plani temaya gore */
+[data-theme="muzehher"] option,
+[data-theme="parsomen"] option,
+[data-theme="atlas"] option,
+[data-theme="sage"] option,
+[data-theme="mehtap"] option {
+  background-color: var(--theme-bg-2) !important;
+  color: var(--theme-ink) !important;
+}
+
+/* Acik temalarda gradient arka plan yumusatma — siyah nokta gorunmez olsun */
+[data-theme="muzehher"] .bg-gradient-to-r.from-transparent,
+[data-theme="parsomen"] .bg-gradient-to-r.from-transparent,
+[data-theme="atlas"] .bg-gradient-to-r.from-transparent,
+[data-theme="sage"] .bg-gradient-to-r.from-transparent,
+[data-theme="mehtap"] .bg-gradient-to-r.from-transparent {
+  opacity: 0.3;
+}
+
+/* ============================================================
+   UTILITY: tema-dustu siniflar (komponentlerde kullanilabilir)
+   ============================================================ */
+
+.theme-bg { background-color: var(--theme-bg); }
+.theme-surface { background-color: var(--theme-surface); }
+.theme-text { color: var(--theme-ink); }
+.theme-text-soft { color: var(--theme-ink-soft); }
+.theme-text-mute { color: var(--theme-ink-mute); }
+.theme-border { border-color: var(--theme-border); }
+.theme-accent { color: var(--theme-accent); }
+.theme-bg-accent { background-color: var(--theme-accent); }
+.theme-font-display { font-family: var(--theme-font-display); }
+.theme-font-script { font-family: var(--theme-font-script); }
+.theme-font-mono { font-family: var(--theme-font-mono); }
+
+/* ============================================================
+   KAYDIRMA & ANIMASYON
+   ============================================================ */
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -75,7 +357,7 @@ h1, h2, h3, .serif {
   .animate-fade-in-up {
     animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
-  
+
   .animate-fade-in {
     animation: fadeIn 0.4s ease-out forwards;
   }
@@ -98,5 +380,13 @@ h1, h2, h3, .serif {
   }
   to {
     opacity: 1;
+  }
+}
+
+/* Kullanici reduced motion isterse animasyonlari kapat */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
