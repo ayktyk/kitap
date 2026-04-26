@@ -132,6 +132,98 @@ export const deleteBook = async (id: string): Promise<void> => {
   }
 };
 
+export interface ExportBundle {
+  version: 1;
+  exportedAt: string;
+  exportedBy: string;
+  bookCount: number;
+  books: Book[];
+}
+
+export const exportBooks = async (userEmail: string): Promise<ExportBundle> => {
+  const books = await getBooks();
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    exportedBy: userEmail,
+    bookCount: books.length,
+    books,
+  };
+};
+
+export interface ImportSummary {
+  total: number;
+  imported: number;
+  skipped: number;
+  failed: number;
+  errors: string[];
+}
+
+export interface ImportOptions {
+  conflictMode: 'skip' | 'overwrite' | 'duplicate';
+}
+
+export const importBooks = async (
+  bundle: ExportBundle,
+  options: ImportOptions = { conflictMode: 'skip' },
+): Promise<ImportSummary> => {
+  if (!bundle || bundle.version !== 1 || !Array.isArray(bundle.books)) {
+    throw new Error('Geçersiz yedek dosyası. Lütfen doğru bir kitaplık yedeği yükleyin.');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error('Önce giriş yapmanız gerekir.');
+
+  const existingBooks = await getBooks();
+  const existingIds = new Set(existingBooks.map((b) => b.id));
+  const existingTitleAuthor = new Set(
+    existingBooks.map((b) => `${b.title.trim().toLowerCase()}|${b.author.trim().toLowerCase()}`),
+  );
+
+  const summary: ImportSummary = {
+    total: bundle.books.length,
+    imported: 0,
+    skipped: 0,
+    failed: 0,
+    errors: [],
+  };
+
+  for (const incoming of bundle.books) {
+    try {
+      const titleAuthorKey = `${(incoming.title || '').trim().toLowerCase()}|${(incoming.author || '').trim().toLowerCase()}`;
+      const idConflict = existingIds.has(incoming.id);
+      const contentConflict = titleAuthorKey !== '|' && existingTitleAuthor.has(titleAuthorKey);
+
+      if ((idConflict || contentConflict) && options.conflictMode === 'skip') {
+        summary.skipped += 1;
+        continue;
+      }
+
+      let bookToSave: Book = { ...incoming };
+
+      if (options.conflictMode === 'duplicate' || idConflict) {
+        bookToSave = {
+          ...bookToSave,
+          id: crypto.randomUUID(),
+          quotes: (bookToSave.quotes || []).map((q) => ({ ...q, id: crypto.randomUUID() })),
+        };
+      }
+
+      await saveBook(bookToSave);
+      summary.imported += 1;
+      existingIds.add(bookToSave.id);
+      existingTitleAuthor.add(titleAuthorKey);
+    } catch (err) {
+      summary.failed += 1;
+      const message = err instanceof Error ? err.message : String(err);
+      summary.errors.push(`${incoming.title || 'Bilinmeyen kitap'}: ${message}`);
+    }
+  }
+
+  return summary;
+};
+
 export const uploadCoverImage = async (file: File): Promise<string> => {
   const {
     data: { session },

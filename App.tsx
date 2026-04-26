@@ -122,6 +122,95 @@ const AppContent: React.FC = () => {
     await supabase.auth.signOut();
   };
 
+  const handleExport = async () => {
+    try {
+      const userEmail = session?.user?.email || 'bilinmeyen';
+      const bundle = await supabaseService.exportBooks(userEmail);
+
+      if (bundle.bookCount === 0) {
+        alert('Kütüphanenizde aktarılacak kitap yok.');
+        return;
+      }
+
+      const json = JSON.stringify(bundle, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      const datePart = new Date().toISOString().slice(0, 10);
+      const safeEmail = userEmail.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      const fileName = `kitapligim-${safeEmail}-${datePart}.json`;
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      alert(`${bundle.bookCount} kitap "${fileName}" dosyasına aktarıldı. Dosyayı güvenli bir yerde saklayın.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      alert(`Dışa aktarma başarısız: ${message}`);
+    }
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      const text = await file.text();
+      let bundle: supabaseService.ExportBundle;
+      try {
+        bundle = JSON.parse(text);
+      } catch {
+        alert('Dosya geçerli bir JSON yedeği değil.');
+        return;
+      }
+
+      if (!bundle || bundle.version !== 1 || !Array.isArray(bundle.books)) {
+        alert('Bu dosya bir Kitaplığım yedeği değil ya da bozuk. Dışa Aktar ile oluşturulmuş bir JSON dosyası seçin.');
+        return;
+      }
+
+      const fromInfo = bundle.exportedBy ? `\nKaynak hesap: ${bundle.exportedBy}` : '';
+      const choice = window.prompt(
+        `${bundle.bookCount} kitap içe aktarılacak.${fromInfo}\n\n` +
+        'Aynı kitap iki hesapta da varsa ne yapılsın?\n' +
+        '  1 = Atla (mevcut kitabı koru) — varsayılan\n' +
+        '  2 = Üzerine yaz (yedekteki sürümle değiştir)\n' +
+        '  3 = Çift kayıt olarak ekle\n\n' +
+        '1, 2 veya 3 yazın:',
+        '1',
+      );
+
+      if (choice === null) {
+        return;
+      }
+
+      const conflictMode: supabaseService.ImportOptions['conflictMode'] =
+        choice.trim() === '2' ? 'overwrite' : choice.trim() === '3' ? 'duplicate' : 'skip';
+
+      const summary = await supabaseService.importBooks(bundle, { conflictMode });
+      await loadBooks();
+
+      const lines = [
+        `İçe aktarma tamamlandı.`,
+        `• Eklenen: ${summary.imported}`,
+        `• Atlanan: ${summary.skipped}`,
+        `• Başarısız: ${summary.failed}`,
+      ];
+      if (summary.errors.length > 0) {
+        lines.push('', 'Hatalar:', ...summary.errors.slice(0, 5));
+        if (summary.errors.length > 5) {
+          lines.push(`...ve ${summary.errors.length - 5} hata daha`);
+        }
+      }
+      alert(lines.join('\n'));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      alert(`İçe aktarma başarısız: ${message}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--theme-bg)' }}>
@@ -246,6 +335,8 @@ const AppContent: React.FC = () => {
           setSelectedBook(null);
         }}
         onOpenThemeSwitcher={() => setThemeSwitcherOpen(true)}
+        onExport={handleExport}
+        onImport={handleImport}
       />
 
       <ThemeSwitcher isOpen={themeSwitcherOpen} onClose={() => setThemeSwitcherOpen(false)} />

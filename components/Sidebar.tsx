@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { BookFilter } from '../types';
-import { X, Library, Star, LogOut, Clock, Calendar, Bookmark, Palette } from 'lucide-react';
+import { X, Library, Star, LogOut, Clock, Calendar, Bookmark, Palette, Download, Upload } from 'lucide-react';
 import { useTheme } from '../lib/themeContext';
 import { getThemeMeta } from '../lib/theme';
 import Logo from './Logo';
@@ -14,9 +14,26 @@ interface Props {
   onFilterChange: (filter: BookFilter) => void;
   onNavigateHome: () => void;
   onOpenThemeSwitcher: () => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
 }
 
-const Sidebar: React.FC<Props> = ({ isOpen, onClose, onSignOut, userEmail, activeFilter, onFilterChange, onNavigateHome, onOpenThemeSwitcher }) => {
+const Sidebar: React.FC<Props> = ({ isOpen, onClose, onSignOut, userEmail, activeFilter, onFilterChange, onNavigateHome, onOpenThemeSwitcher, onExport, onImport }) => {
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onImport(file);
+    }
+    if (importInputRef.current) {
+      importInputRef.current.value = '';
+    }
+  };
   const { theme } = useTheme();
   const activeThemeMeta = getThemeMeta(theme);
   const menuItems: Array<{ id: BookFilter; label: string; icon: React.ReactNode }> = [
@@ -87,8 +104,41 @@ const Sidebar: React.FC<Props> = ({ isOpen, onClose, onSignOut, userEmail, activ
             ))}
           </nav>
 
-          {/* Tema seçimi + Footer */}
+          {/* Yedekleme + Tema seçimi + Footer */}
           <div className="p-4 border-t border-white/5 space-y-2">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImportFileChange}
+              className="hidden"
+            />
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  onExport();
+                  onClose();
+                }}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all text-white/60 hover:text-white hover:bg-white/5 border border-white/5"
+                title="Tüm kitaplarınızı JSON dosyası olarak indirir"
+              >
+                <Download size={16} className="text-white/40" />
+                <span className="text-[11px] font-bold uppercase tracking-wider">Dışa Aktar</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  handleImportClick();
+                }}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all text-white/60 hover:text-white hover:bg-white/5 border border-white/5"
+                title="JSON yedek dosyasından kitapları yükler"
+              >
+                <Upload size={16} className="text-white/40" />
+                <span className="text-[11px] font-bold uppercase tracking-wider">İçe Aktar</span>
+              </button>
+            </div>
+
             <button
               onClick={() => {
                 onOpenThemeSwitcher();
