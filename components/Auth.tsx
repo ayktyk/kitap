@@ -45,6 +45,13 @@ const Auth: React.FC<AuthProps> = ({ initialMode = 'login', onPasswordReset }) =
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else if (mode === 'forgot') {
+        const { data: exists, error: checkError } = await supabase.rpc('user_exists', {
+          email_to_check: email,
+        });
+        if (checkError) throw checkError;
+        if (!exists) {
+          throw new Error('Bu e-posta adresine ait bir kullanıcı kaydı bulunamadı.');
+        }
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin,
         });
