@@ -57,27 +57,51 @@ function tx<T>(
     (db) =>
       new Promise<T>((resolve, reject) => {
         const transaction = db.transaction(storeNames, mode);
-        let result: T;
-        let settled = false;
+        let bodyResult: T;
+        let bodySettled = false;
+        let bodyError: unknown = null;
+        let txDone = false;
+        let finalized = false;
 
-        const finish = (value: T) => {
-          settled = true;
-          result = value;
+        const finalize = () => {
+          if (finalized) return;
+          if (!bodySettled || !txDone) return;
+          finalized = true;
+          if (bodyError) reject(bodyError);
+          else resolve(bodyResult);
         };
 
         Promise.resolve(body(transaction))
-          .then(finish)
+          .then((value) => {
+            bodyResult = value;
+            bodySettled = true;
+            finalize();
+          })
           .catch((error) => {
-            settled = true;
-            transaction.abort();
-            reject(error);
+            bodyError = error;
+            bodySettled = true;
+            try {
+              transaction.abort();
+            } catch {
+              /* zaten kapanmış olabilir */
+            }
+            finalize();
           });
 
         transaction.oncomplete = () => {
-          if (settled) resolve(result!);
+          txDone = true;
+          finalize();
         };
-        transaction.onabort = () => reject(transaction.error || new Error('Transaction aborted'));
-        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => {
+          if (finalized) return;
+          finalized = true;
+          reject(bodyError || transaction.error || new Error('Transaction aborted'));
+        };
+        transaction.onerror = () => {
+          if (finalized) return;
+          finalized = true;
+          reject(transaction.error || bodyError || new Error('Transaction error'));
+        };
       }),
   );
 }
@@ -183,23 +207,55 @@ async function resolveCoverUrl(
 export const getBooks = async (): Promise<Book[]> => {
   await ensureInitialized();
 
-  return tx([BOOKS_STORE, COVERS_STORE], 'readonly', async (transaction) => {
-    const booksStore = transaction.objectStore(BOOKS_STORE);
-    const coversStore = transaction.objectStore(COVERS_STORE);
-    const books = (await reqToPromise(booksStore.getAll())) as Book[];
+  // Transaction içinde sadece DB oku — kitaplar + ihtiyaç duyulan kapak blob'ları.
+  const { books, blobs } = await tx(
+    [BOOKS_STORE, COVERS_STORE],
+    'readonly',
+    async (transaction) => {
+      const booksStore = transaction.objectStore(BOOKS_STORE);
+      const coversStore = transaction.objectStore(COVERS_STORE);
+      const allBooks = (await reqToPromise(booksStore.getAll())) as Book[];
 
-    const resolved: Book[] = [];
-    for (const stored of books) {
-      const coverUrl = await resolveCoverUrl(coversStore, stored.coverUrl);
-      resolved.push({
-        ...stored,
-        coverUrl,
-      });
+      const neededIds = new Set<string>();
+      for (const book of allBooks) {
+        if (isLocalCoverRef(book.coverUrl)) {
+          neededIds.add(localRefToId(book.coverUrl!));
+        }
+      }
+
+      const blobMap = new Map<string, Blob>();
+      for (const id of neededIds) {
+        if (blobUrlByCoverId.has(id)) continue; // zaten cache'de URL üretilmiş
+        const record = (await reqToPromise(coversStore.get(id))) as CoverRecord | undefined;
+        if (record) blobMap.set(id, record.blob);
+      }
+
+      return { books: allBooks, blobs: blobMap };
+    },
+  );
+
+  // Transaction dışında URL.createObjectURL — sync ama yine de güvenli tarafta kalalım.
+  const resolved: Book[] = books.map((stored) => {
+    let coverUrl = '';
+    if (stored.coverUrl) {
+      if (isLocalCoverRef(stored.coverUrl)) {
+        const id = localRefToId(stored.coverUrl);
+        const cached = blobUrlByCoverId.get(id);
+        if (cached) {
+          coverUrl = cached;
+        } else {
+          const blob = blobs.get(id);
+          if (blob) coverUrl = blobUrlForCover(id, blob);
+        }
+      } else {
+        coverUrl = stored.coverUrl;
+      }
     }
-
-    resolved.sort((left, right) => (right.createdAt || 0) - (left.createdAt || 0));
-    return resolved;
+    return { ...stored, coverUrl };
   });
+
+  resolved.sort((left, right) => (right.createdAt || 0) - (left.createdAt || 0));
+  return resolved;
 };
 
 export const saveBook = async (book: Book): Promise<void> => {
@@ -340,7 +396,11 @@ function base64ToBlob(data: string, mimeType: string): Blob {
 export const exportBooks = async (exportedBy?: string): Promise<ExportBundle> => {
   await ensureInitialized();
 
-  return tx([BOOKS_STORE, COVERS_STORE], 'readonly', async (transaction) => {
+  // 1) Transaction içinde sadece IndexedDB işleri: kitaplar ve cover blobları topla.
+  //    Async base64 dönüşümü transaction içinde yapılırsa IndexedDB transaction'ı
+  //    auto-commit edip "inactive" duruma geçer, takılır. O yüzden burada SADECE
+  //    DB okuyoruz, sonra dışarı çıkıyoruz.
+  const collected = await tx([BOOKS_STORE, COVERS_STORE], 'readonly', async (transaction) => {
     const booksStore = transaction.objectStore(BOOKS_STORE);
     const coversStore = transaction.objectStore(COVERS_STORE);
     const books = (await reqToPromise(booksStore.getAll())) as Book[];
@@ -352,23 +412,39 @@ export const exportBooks = async (exportedBy?: string): Promise<ExportBundle> =>
       }
     }
 
-    const covers: ExportCoverEntry[] = [];
+    const blobs: { id: string; blob: Blob; mimeType: string }[] = [];
     for (const id of referencedIds) {
       const record = (await reqToPromise(coversStore.get(id))) as CoverRecord | undefined;
       if (!record) continue;
-      const data = await blobToBase64(record.blob);
-      covers.push({ id, mimeType: record.mimeType || record.blob.type, data });
+      blobs.push({
+        id,
+        blob: record.blob,
+        mimeType: record.mimeType || record.blob.type,
+      });
     }
 
-    return {
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      exportedBy,
-      bookCount: books.length,
-      books,
-      covers,
-    };
+    return { books, blobs };
   });
+
+  // 2) Transaction kapandıktan sonra base64 dönüşümlerini yap.
+  const covers: ExportCoverEntry[] = [];
+  for (const item of collected.blobs) {
+    try {
+      const data = await blobToBase64(item.blob);
+      covers.push({ id: item.id, mimeType: item.mimeType, data });
+    } catch (error) {
+      console.warn('Kapak base64\'e çevrilemedi, atlanıyor:', item.id, error);
+    }
+  }
+
+  return {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    exportedBy,
+    bookCount: collected.books.length,
+    books: collected.books,
+    covers,
+  };
 };
 
 export interface ImportSummary {
