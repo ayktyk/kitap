@@ -1,21 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Session } from '@supabase/supabase-js';
 import {
   ArrowUpDown,
   Plus,
   Search,
-  User,
 } from 'lucide-react';
 import Logo from './components/Logo';
 import { MeshGradient } from '@paper-design/shaders-react';
 import BookDetails from './components/BookDetails';
 import BookForm from './components/BookForm';
 import BookList from './components/BookList';
-import Auth from './components/Auth';
 import Sidebar from './components/Sidebar';
 import ThemeSwitcher from './components/ThemeSwitcher';
-import { supabase } from './lib/supabase';
-import * as supabaseService from './services/supabaseService';
+import * as libraryService from './services/libraryService';
 import { Book, BookFilter, ViewState } from './types';
 import { ThemeProvider, useTheme } from './lib/themeContext';
 
@@ -46,9 +42,7 @@ const sortLabels: Record<SortOption, string> = {
 const AppContent: React.FC = () => {
   const { theme } = useTheme();
   const isDarkTheme = theme === 'karanlik';
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [recoveryMode, setRecoveryMode] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
   const [view, setView] = useState<ViewState>('LIST');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -59,39 +53,30 @@ const AppContent: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('NEWEST');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, currentSession) => {
-      setSession(currentSession);
-      if (event === 'PASSWORD_RECOVERY') {
-        setRecoveryMode(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await libraryService.getBooks();
+        if (!cancelled) setBooks(data);
+      } catch (error) {
+        console.error('Kitaplık yüklenemedi:', error);
+        if (!cancelled) setBooks([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    });
-
-    return () => subscription.unsubscribe();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    if (session) {
-      loadBooks();
-      return;
-    }
-
-    setBooks([]);
-  }, [session]);
-
   const loadBooks = async () => {
-    const data = await supabaseService.getBooks();
+    const data = await libraryService.getBooks();
     setBooks(data);
   };
 
   const handleSaveBook = async (book: Book) => {
-    await supabaseService.saveBook(book);
+    await libraryService.saveBook(book);
     await loadBooks();
     setView('LIST');
     setSelectedBook(null);
@@ -99,7 +84,7 @@ const AppContent: React.FC = () => {
 
   const handleDeleteBook = async (id: string) => {
     if (window.confirm('Bu kitabı silmek istediğinize emin misiniz?')) {
-      await supabaseService.deleteBook(id);
+      await libraryService.deleteBook(id);
       await loadBooks();
       setView('LIST');
       setSelectedBook(null);
@@ -118,14 +103,9 @@ const AppContent: React.FC = () => {
     setView('DETAILS');
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
   const handleExport = async () => {
     try {
-      const userEmail = session?.user?.email || 'bilinmeyen';
-      const bundle = await supabaseService.exportBooks(userEmail);
+      const bundle = await libraryService.exportBooks();
 
       if (bundle.bookCount === 0) {
         alert('Kütüphanenizde aktarılacak kitap yok.');
@@ -137,8 +117,7 @@ const AppContent: React.FC = () => {
       const url = URL.createObjectURL(blob);
 
       const datePart = new Date().toISOString().slice(0, 10);
-      const safeEmail = userEmail.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      const fileName = `kitapligim-${safeEmail}-${datePart}.json`;
+      const fileName = `kitapligim-${datePart}.json`;
 
       const link = document.createElement('a');
       link.href = url;
@@ -158,7 +137,7 @@ const AppContent: React.FC = () => {
   const handleImport = async (file: File) => {
     try {
       const text = await file.text();
-      let bundle: supabaseService.ExportBundle;
+      let bundle: libraryService.AnyExportBundle;
       try {
         bundle = JSON.parse(text);
       } catch {
@@ -166,7 +145,7 @@ const AppContent: React.FC = () => {
         return;
       }
 
-      if (!bundle || bundle.version !== 1 || !Array.isArray(bundle.books)) {
+      if (!libraryService.isValidBundle(bundle)) {
         alert('Bu dosya bir Kitaplığım yedeği değil ya da bozuk. Dışa Aktar ile oluşturulmuş bir JSON dosyası seçin.');
         return;
       }
@@ -174,7 +153,7 @@ const AppContent: React.FC = () => {
       const fromInfo = bundle.exportedBy ? `\nKaynak hesap: ${bundle.exportedBy}` : '';
       const choice = window.prompt(
         `${bundle.bookCount} kitap içe aktarılacak.${fromInfo}\n\n` +
-        'Aynı kitap iki hesapta da varsa ne yapılsın?\n' +
+        'Aynı kitap iki kayıtta da varsa ne yapılsın?\n' +
         '  1 = Atla (mevcut kitabı koru) — varsayılan\n' +
         '  2 = Üzerine yaz (yedekteki sürümle değiştir)\n' +
         '  3 = Çift kayıt olarak ekle\n\n' +
@@ -186,10 +165,10 @@ const AppContent: React.FC = () => {
         return;
       }
 
-      const conflictMode: supabaseService.ImportOptions['conflictMode'] =
+      const conflictMode: libraryService.ImportOptions['conflictMode'] =
         choice.trim() === '2' ? 'overwrite' : choice.trim() === '3' ? 'duplicate' : 'skip';
 
-      const summary = await supabaseService.importBooks(bundle, { conflictMode });
+      const summary = await libraryService.importBooks(bundle, { conflictMode });
       await loadBooks();
 
       const lines = [
@@ -216,40 +195,6 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--theme-bg)' }}>
         <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: 'var(--theme-border)', borderTopColor: 'var(--theme-ink)' }} />
       </div>
-    );
-  }
-
-  if (!session || recoveryMode) {
-    return (
-      <>
-        <div className="fixed inset-0 -z-10" style={{ backgroundColor: 'var(--theme-bg)' }}>
-          {isDarkTheme && (
-            <MeshGradient
-              className="w-full h-full opacity-40"
-              colors={['#101010', '#1a1a1a', '#2a2a2a', '#010101']}
-              speed={0.8}
-            />
-          )}
-        </div>
-        <Auth
-          initialMode={recoveryMode ? 'reset' : 'login'}
-          onPasswordReset={() => setRecoveryMode(false)}
-        />
-        <ThemeSwitcher isOpen={themeSwitcherOpen} onClose={() => setThemeSwitcherOpen(false)} />
-        {/* Auth ekraninda da tema degistirme dugmesi */}
-        <button
-          type="button"
-          onClick={() => setThemeSwitcherOpen(true)}
-          className="fixed top-5 right-5 z-50 px-3.5 py-2 rounded-full border text-[11px] font-bold uppercase tracking-[0.18em] transition-all hover:scale-105 active:scale-95 backdrop-blur-md"
-          style={{
-            backgroundColor: 'var(--theme-surface)',
-            borderColor: 'var(--theme-border)',
-            color: 'var(--theme-ink-soft)',
-          }}
-        >
-          Tema
-        </button>
-      </>
     );
   }
 
@@ -326,8 +271,6 @@ const AppContent: React.FC = () => {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onSignOut={handleSignOut}
-        userEmail={session.user.email}
         activeFilter={filter}
         onFilterChange={setFilter}
         onNavigateHome={() => {
@@ -368,15 +311,6 @@ const AppContent: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
-              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10 mr-2">
-                <div className="w-5 h-5 bg-white/10 rounded-full flex items-center justify-center">
-                  <User size={12} className="text-white/70" />
-                </div>
-                <span className="text-[10px] text-white/60 font-medium max-w-[120px] truncate">
-                  {session.user.email}
-                </span>
-              </div>
-
               {view === 'LIST' && (
                 <div className="hidden lg:flex items-center bg-white/5 p-1 rounded-lg border border-white/5">
                   {filterOptions.map((option) => (

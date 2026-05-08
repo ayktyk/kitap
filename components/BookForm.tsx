@@ -17,7 +17,7 @@ import { BrowserMultiFormatReader } from '@zxing/browser';
 import { v4 as uuidv4 } from 'uuid';
 import { Book, BookLookupResult, Quote } from '../types';
 import { lookupBookByIsbn } from '../services/bookLookupService';
-import { uploadCoverImage } from '../services/supabaseService';
+import { saveCoverImage } from '../services/libraryService';
 import RatingStars from './RatingStars';
 
 interface Props {
@@ -40,19 +40,15 @@ const getUploadErrorMessage = (error: unknown) => {
     typeof error === 'object' && error && 'message' in error ? String(error.message) : '';
   const loweredMessage = message.toLowerCase();
 
-  if (loweredMessage.includes('bucket')) {
-    return 'Kapak yükleme alanı henüz hazır değil. Supabase storage kurulumu tamamlanmalı.';
+  if (loweredMessage.includes('quota') || loweredMessage.includes('storage')) {
+    return 'Tarayıcı yerel deposu dolmuş görünüyor. Eski kitapları temizleyin veya başka bir tarayıcı deneyin.';
   }
 
-  if (loweredMessage.includes('row-level security') || loweredMessage.includes('permission')) {
-    return 'Kapak yükleme yetkisi eksik görünüyor. Storage policy ayarları kontrol edilmeli.';
+  if (loweredMessage.includes('indexeddb') || loweredMessage.includes('database')) {
+    return 'Yerel veritabanına erişilemedi. Tarayıcıyı yenileyip tekrar deneyin.';
   }
 
-  if (loweredMessage.includes('authenticated') || loweredMessage.includes('jwt')) {
-    return 'Kapak yüklemek için tekrar giriş yapman gerekebilir.';
-  }
-
-  return 'Kapak resmi yüklenemedi. Şimdilik kapaksız kaydedebilir veya daha sonra tekrar deneyebilirsin.';
+  return 'Kapak resmi kaydedilemedi. Şimdilik kapaksız kaydedebilir veya daha sonra tekrar deneyebilirsin.';
 };
 
 const getSaveErrorMessage = (error: unknown) => {
@@ -60,16 +56,12 @@ const getSaveErrorMessage = (error: unknown) => {
     typeof error === 'object' && error && 'message' in error ? String(error.message) : '';
   const loweredMessage = message.toLowerCase();
 
-  if (loweredMessage.includes('cover_url') || loweredMessage.includes('is_favorite')) {
-    return 'Veritabanı tablosu yeni alanlarla tam uyumlu değil. Kitap tablosunu güncellememiz gerekebilir.';
+  if (loweredMessage.includes('quota')) {
+    return 'Tarayıcı yerel deposu dolu. Eski kitapları silin veya yedek alıp temizleyin.';
   }
 
-  if (loweredMessage.includes('permission') || loweredMessage.includes('row-level security')) {
-    return 'Kaydetme yetkisi hatası var. Supabase RLS ayarları kontrol edilmeli.';
-  }
-
-  if (loweredMessage.includes('json') || loweredMessage.includes('invalid input')) {
-    return 'Kayıt verilerinden biri veritabanında kabul edilmedi. Alıntı veya ek alanları kontrol et.';
+  if (loweredMessage.includes('indexeddb') || loweredMessage.includes('database')) {
+    return 'Yerel veritabanına yazılamadı. Tarayıcıyı yenileyip tekrar deneyin.';
   }
 
   return 'Kitap kaydedilemedi. Lütfen tekrar deneyin.';
@@ -147,7 +139,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
     try {
       setUploading(true);
       setUploadError(null);
-      const publicUrl = await uploadCoverImage(file);
+      const publicUrl = await saveCoverImage(file);
       setFormData((previous) => ({ ...previous, coverUrl: publicUrl }));
     } catch (error) {
       console.error('Upload failed:', error);
