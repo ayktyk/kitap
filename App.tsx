@@ -9,6 +9,7 @@ import { MeshGradient } from '@paper-design/shaders-react';
 import BookDetails from './components/BookDetails';
 import BookForm from './components/BookForm';
 import BookList from './components/BookList';
+import ExportDialog from './components/ExportDialog';
 import Sidebar from './components/Sidebar';
 import ThemeSwitcher from './components/ThemeSwitcher';
 import * as libraryService from './services/libraryService';
@@ -51,6 +52,7 @@ const AppContent: React.FC = () => {
   const [themeSwitcherOpen, setThemeSwitcherOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('NEWEST');
+  const [exportPayload, setExportPayload] = useState<{ json: string; fileName: string; bookCount: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,41 +118,9 @@ const AppContent: React.FC = () => {
       const datePart = new Date().toISOString().slice(0, 10);
       const fileName = `kitapligim-${datePart}.json`;
 
-      // 1) iOS PWA dahil çoğu mobilde en sağlam yol: sistem paylaş menüsü
-      try {
-        const file = new File([json], fileName, { type: 'application/json' });
-        const nav = navigator as Navigator & {
-          canShare?: (data?: { files?: File[] }) => boolean;
-          share?: (data?: { files?: File[]; title?: string; text?: string }) => Promise<void>;
-        };
-        if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
-          await nav.share({
-            files: [file],
-            title: fileName,
-            text: `Kitaplığım yedeği — ${bundle.bookCount} kitap`,
-          });
-          return;
-        }
-      } catch (shareErr) {
-        // Kullanıcı paylaş menüsünü iptal ettiyse sessizce çık
-        if (shareErr instanceof Error && shareErr.name === 'AbortError') {
-          return;
-        }
-        console.warn('Paylaş menüsü açılamadı, klasik indirmeye geçiliyor:', shareErr);
-      }
-
-      // 2) Klasik tarayıcı indirmesi (masaüstü ve PWA olmayan mobil)
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      alert(`${bundle.bookCount} kitap "${fileName}" dosyasına aktarıldı. Dosyayı güvenli bir yerde saklayın.`);
+      // Veriyi pencerede sun — kullanıcı paylaş/indir/kopyala arasından seçer.
+      // Bu sayede iOS PWA'da gerekli "user gesture" indirme/paylaşım anında korunur.
+      setExportPayload({ json, fileName, bookCount: bundle.bookCount });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Bilinmeyen hata';
       alert(`Dışa aktarma başarısız: ${message}`);
@@ -306,6 +276,15 @@ const AppContent: React.FC = () => {
       />
 
       <ThemeSwitcher isOpen={themeSwitcherOpen} onClose={() => setThemeSwitcherOpen(false)} />
+
+      {exportPayload && (
+        <ExportDialog
+          json={exportPayload.json}
+          fileName={exportPayload.fileName}
+          bookCount={exportPayload.bookCount}
+          onClose={() => setExportPayload(null)}
+        />
+      )}
 
       <nav className="border-b border-white/5 sticky top-0 z-50 bg-black/20 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
