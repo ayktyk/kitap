@@ -74,7 +74,12 @@ const Sidebar: React.FC<Props> = ({ isOpen, onClose, activeFilter, onFilterChang
                 <HardDrive size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-0.5">Yerel Kütüphane</p>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Yerel Kütüphane</p>
+                  <span className="text-[8px] uppercase tracking-widest font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded-full">
+                    v2
+                  </span>
+                </div>
                 <p className="text-xs font-bold text-white/80 truncate">Veriler bu cihazda saklanır</p>
               </div>
             </div>

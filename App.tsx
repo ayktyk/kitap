@@ -52,7 +52,7 @@ const AppContent: React.FC = () => {
   const [themeSwitcherOpen, setThemeSwitcherOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('NEWEST');
-  const [exportPayload, setExportPayload] = useState<{ json: string; fileName: string; bookCount: number } | null>(null);
+  const [exportPayload, setExportPayload] = useState<{ json: string | null; fileName: string; bookCount: number; error?: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,26 +105,22 @@ const AppContent: React.FC = () => {
     setView('DETAILS');
   };
 
-  const handleExport = async () => {
-    try {
-      const bundle = await libraryService.exportBooks();
+  const handleExport = () => {
+    // Pencereyi HEMEN aç ki kullanıcı yeni sürüm yüklü mü hemen görsün.
+    setExportPayload({ json: null, fileName: '', bookCount: 0 });
 
-      if (bundle.bookCount === 0) {
-        alert('Kütüphanenizde aktarılacak kitap yok.');
-        return;
+    (async () => {
+      try {
+        const bundle = await libraryService.exportBooks();
+        const datePart = new Date().toISOString().slice(0, 10);
+        const fileName = `kitapligim-${datePart}.json`;
+        const json = JSON.stringify(bundle, null, 2);
+        setExportPayload({ json, fileName, bookCount: bundle.bookCount });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Bilinmeyen hata';
+        setExportPayload({ json: null, fileName: '', bookCount: 0, error: message });
       }
-
-      const json = JSON.stringify(bundle, null, 2);
-      const datePart = new Date().toISOString().slice(0, 10);
-      const fileName = `kitapligim-${datePart}.json`;
-
-      // Veriyi pencerede sun — kullanıcı paylaş/indir/kopyala arasından seçer.
-      // Bu sayede iOS PWA'da gerekli "user gesture" indirme/paylaşım anında korunur.
-      setExportPayload({ json, fileName, bookCount: bundle.bookCount });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Bilinmeyen hata';
-      alert(`Dışa aktarma başarısız: ${message}`);
-    }
+    })();
   };
 
   const handleImport = async (file: File) => {
@@ -282,6 +278,7 @@ const AppContent: React.FC = () => {
           json={exportPayload.json}
           fileName={exportPayload.fileName}
           bookCount={exportPayload.bookCount}
+          error={exportPayload.error}
           onClose={() => setExportPayload(null)}
         />
       )}
