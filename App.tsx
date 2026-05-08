@@ -113,12 +113,35 @@ const AppContent: React.FC = () => {
       }
 
       const json = JSON.stringify(bundle, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-
       const datePart = new Date().toISOString().slice(0, 10);
       const fileName = `kitapligim-${datePart}.json`;
 
+      // 1) iOS PWA dahil çoğu mobilde en sağlam yol: sistem paylaş menüsü
+      try {
+        const file = new File([json], fileName, { type: 'application/json' });
+        const nav = navigator as Navigator & {
+          canShare?: (data?: { files?: File[] }) => boolean;
+          share?: (data?: { files?: File[]; title?: string; text?: string }) => Promise<void>;
+        };
+        if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
+          await nav.share({
+            files: [file],
+            title: fileName,
+            text: `Kitaplığım yedeği — ${bundle.bookCount} kitap`,
+          });
+          return;
+        }
+      } catch (shareErr) {
+        // Kullanıcı paylaş menüsünü iptal ettiyse sessizce çık
+        if (shareErr instanceof Error && shareErr.name === 'AbortError') {
+          return;
+        }
+        console.warn('Paylaş menüsü açılamadı, klasik indirmeye geçiliyor:', shareErr);
+      }
+
+      // 2) Klasik tarayıcı indirmesi (masaüstü ve PWA olmayan mobil)
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
