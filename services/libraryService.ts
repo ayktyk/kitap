@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { Book } from '../types';
 
 // Local-first kitaplık servisi.
@@ -12,6 +13,13 @@ const BOOKS_STORE = 'books';
 const COVERS_STORE = 'covers';
 const LEGACY_LOCALSTORAGE_KEY = 'my_library_books_v1';
 const LEGACY_FLAG_KEY = 'my_library_localstorage_migrated_v1';
+const AUTO_BACKUP_KEY = 'kitaplik:auto-backups';
+const MAX_AUTO_BACKUPS = 3;
+// İçe aktarılan kapak base64'ü için üst sınır (~9MB çözülmüş) — kötü niyetli/bozuk
+// yedekte ana iş parçacığını dondurmamak için (DoS koruması).
+const MAX_COVER_BASE64 = 12_000_000;
+// İçe aktarmada coverUrl için izinli şemalar (CSS url() enjeksiyonuna karşı).
+const SAFE_COVER_URL = /^(local:|https?:\/\/|blob:)/i;
 
 const LOCAL_PREFIX = 'local:';
 
@@ -128,6 +136,17 @@ function blobUrlForCover(id: string, blob: Blob): string {
   blobUrlByCoverId.set(id, url);
   coverIdByBlobUrl.set(url, id);
   return url;
+}
+
+// Bir kapağın bellekteki blob URL'sini serbest bırakır ve cache'ten siler.
+// Kapak değiştiğinde/silindiğinde çağrılır — bellek sızıntısını önler.
+function revokeCover(id: string): void {
+  const url = blobUrlByCoverId.get(id);
+  if (url) {
+    URL.revokeObjectURL(url);
+    blobUrlByCoverId.delete(id);
+    coverIdByBlobUrl.delete(url);
+  }
 }
 
 async function readCoverBlob(store: IDBObjectStore, id: string): Promise<Blob | null> {
@@ -280,9 +299,30 @@ export const saveBook = async (book: Book): Promise<void> => {
     quotes: Array.isArray(book.quotes) ? book.quotes : [],
   };
 
-  await tx(BOOKS_STORE, 'readwrite', (transaction) => {
-    transaction.objectStore(BOOKS_STORE).put(toStore);
-  });
+  const orphanedCoverId = await tx(
+    [BOOKS_STORE, COVERS_STORE],
+    'readwrite',
+    async (transaction) => {
+      const booksStore = transaction.objectStore(BOOKS_STORE);
+      const prev = (await reqToPromise(booksStore.get(toStore.id))) as Book | undefined;
+
+      // Kapak değiştiyse eski kapağı temizle (yetim blob kaydı + bellek sızıntısı).
+      let orphan: string | null = null;
+      if (prev && isLocalCoverRef(prev.coverUrl)) {
+        const prevId = localRefToId(prev.coverUrl);
+        const newId = isLocalCoverRef(toStore.coverUrl) ? localRefToId(toStore.coverUrl) : null;
+        if (prevId !== newId) {
+          transaction.objectStore(COVERS_STORE).delete(prevId);
+          orphan = prevId;
+        }
+      }
+
+      booksStore.put(toStore);
+      return orphan;
+    },
+  );
+
+  if (orphanedCoverId) revokeCover(orphanedCoverId);
 };
 
 export const deleteBook = async (id: string): Promise<void> => {
@@ -295,12 +335,7 @@ export const deleteBook = async (id: string): Promise<void> => {
     if (existing && isLocalCoverRef(existing.coverUrl)) {
       const coverId = localRefToId(existing.coverUrl!);
       coversStore.delete(coverId);
-      const cachedUrl = blobUrlByCoverId.get(coverId);
-      if (cachedUrl) {
-        URL.revokeObjectURL(cachedUrl);
-        blobUrlByCoverId.delete(coverId);
-        coverIdByBlobUrl.delete(cachedUrl);
-      }
+      revokeCover(coverId);
     }
     booksStore.delete(id);
   });
@@ -367,21 +402,21 @@ export interface LegacyExportBundleV1 {
 
 export type AnyExportBundle = ExportBundle | LegacyExportBundleV1;
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== 'string') {
-        reject(new Error('FileReader sonucu string değil'));
-        return;
-      }
-      const commaIndex = result.indexOf(',');
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000; // 32KB; String.fromCharCode argüman limitini aşmamak için
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+// Blob -> base64 (data URL ön eki olmadan). FileReader yerine arrayBuffer()
+// kullanıyoruz: hem tarayıcıda hem test ortamında (jsdom/node) realm bağımsız
+// çalışır ve FileReader'ın blob brand-check sorununu ortadan kaldırır.
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer();
+  return bytesToBase64(new Uint8Array(buffer));
 }
 
 function base64ToBlob(data: string, mimeType: string): Blob {
@@ -457,30 +492,113 @@ export interface ImportSummary {
 
 export interface ImportOptions {
   conflictMode: 'skip' | 'overwrite' | 'duplicate';
+  // Otomatik yedek almayı atla (yedekten geri yükleme sırasında özyinelemeyi önler).
+  skipAutoBackup?: boolean;
 }
 
-const isExportBundle = (value: unknown): value is AnyExportBundle => {
-  if (!value || typeof value !== 'object') return false;
-  const v = value as { version?: unknown; books?: unknown };
-  return (v.version === 1 || v.version === 2) && Array.isArray(v.books);
+const looseBookSchema = z.object({});
+const coverEntrySchema = z.object({
+  id: z.string(),
+  data: z.string(),
+  mimeType: z.string().optional(),
+});
+
+// Yapısal doğrulama şeması. Bilinmeyen/yeni alanlar varsayılan olarak elenir
+// (validation yine geçer), bu yüzden gelecek sürümlerin ek alanları kontrolü kırmaz.
+const bundleSchema = z.object({
+  version: z.union([z.literal(1), z.literal(2)]),
+  books: z.array(looseBookSchema),
+  covers: z.array(coverEntrySchema).optional(),
+});
+
+// Yapısal doğrulama. Geçersizse anlamlı bir hata fırlatır (proje strict mod
+// kullanmadığından discriminated-union daraltmasına güvenmiyoruz).
+function assertValidBundle(value: unknown): void {
+  const result = bundleSchema.safeParse(value);
+  if (!result.success) {
+    const detail = result.error.issues
+      .slice(0, 3)
+      .map((issue) => `${issue.path.join('.') || '(kök)'}: ${issue.message}`)
+      .join('; ');
+    throw new Error(
+      `Geçersiz yedek dosyası (${detail || 'bilinmeyen yapı hatası'}). ` +
+        'Lütfen doğru bir kitaplık yedeği yükleyin.',
+    );
+  }
+}
+
+export const isValidBundle = (value: unknown): value is AnyExportBundle =>
+  bundleSchema.safeParse(value).success;
+
+// Başlık+yazar tekilleştirme anahtarı; string olmayan alanlara karşı güvenli.
+function titleAuthorKey(title: unknown, author: unknown): string {
+  const norm = (value: unknown) => String(value ?? '').trim().toLowerCase();
+  return `${norm(title)}|${norm(author)}`;
+}
+
+// ----- Otomatik yedek (içe aktarma öncesi güvenlik ağı) -----
+// Kapaklar hariç tutulur (localStorage kotasını aşmamak için). Kapaklar IDB'de
+// kalır; içe aktarma mevcut kapakları silmediği için yedekten geri yükleme onları korur.
+export interface AutoBackupEntry {
+  createdAt: string;
+  bookCount: number;
+  books: Book[];
+}
+
+export const listAutoBackups = (): AutoBackupEntry[] => {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(AUTO_BACKUP_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as AutoBackupEntry[]) : [];
+  } catch {
+    return [];
+  }
 };
 
-export const isValidBundle = (value: unknown): value is AnyExportBundle => isExportBundle(value);
+export const createAutoBackup = async (): Promise<AutoBackupEntry | null> => {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    await ensureInitialized();
+    const books = await tx(
+      BOOKS_STORE,
+      'readonly',
+      async (transaction) =>
+        (await reqToPromise(transaction.objectStore(BOOKS_STORE).getAll())) as Book[],
+    );
+    const entry: AutoBackupEntry = {
+      createdAt: new Date().toISOString(),
+      bookCount: books.length,
+      books,
+    };
+    const next = [entry, ...listAutoBackups()].slice(0, MAX_AUTO_BACKUPS);
+    localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(next));
+    return entry;
+  } catch (error) {
+    // Yedek alınamazsa içe aktarmayı engelleme — yalnızca uyar.
+    console.warn('Otomatik yedek oluşturulamadı:', error);
+    return null;
+  }
+};
 
 export const importBooks = async (
   bundle: AnyExportBundle,
   options: ImportOptions = { conflictMode: 'skip' },
 ): Promise<ImportSummary> => {
-  if (!isExportBundle(bundle)) {
-    throw new Error('Geçersiz yedek dosyası. Lütfen doğru bir kitaplık yedeği yükleyin.');
-  }
+  assertValidBundle(bundle);
 
   await ensureInitialized();
+
+  // İçe aktarmadan ÖNCE mevcut kütüphanenin otomatik yedeğini al (veri kaybına karşı).
+  if (!options.skipAutoBackup) {
+    await createAutoBackup();
+  }
 
   const existingBooks = await getBooks();
   const existingByTitleAuthor = new Map<string, Book>();
   for (const book of existingBooks) {
-    const key = `${book.title.trim().toLowerCase()}|${book.author.trim().toLowerCase()}`;
+    const key = titleAuthorKey(book.title, book.author);
     if (key !== '|') existingByTitleAuthor.set(key, book);
   }
 
@@ -491,6 +609,10 @@ export const importBooks = async (
       const store = transaction.objectStore(COVERS_STORE);
       for (const cover of bundle.covers) {
         try {
+          if (typeof cover.data !== 'string' || cover.data.length > MAX_COVER_BASE64) {
+            console.warn('Kapak çok büyük veya geçersiz, atlanıyor:', cover.id);
+            continue;
+          }
           const blob = base64ToBlob(cover.data, cover.mimeType || 'image/jpeg');
           const newId = uuid();
           store.put({ id: newId, blob, mimeType: cover.mimeType || blob.type } as CoverRecord);
@@ -518,8 +640,8 @@ export const importBooks = async (
 
   for (const incoming of bundle.books) {
     try {
-      const titleAuthorKey = `${(incoming.title || '').trim().toLowerCase()}|${(incoming.author || '').trim().toLowerCase()}`;
-      const existingMatch = titleAuthorKey !== '|' ? existingByTitleAuthor.get(titleAuthorKey) : undefined;
+      const incomingKey = titleAuthorKey(incoming.title, incoming.author);
+      const existingMatch = incomingKey !== '|' ? existingByTitleAuthor.get(incomingKey) : undefined;
 
       if (existingMatch && options.conflictMode === 'skip') {
         summary.skipped += 1;
@@ -540,6 +662,9 @@ export const importBooks = async (
       } else if (coverUrl && /^https?:\/\//i.test(coverUrl)) {
         // Eski Supabase / dış URL — yerelleştirmeyi dene
         coverUrl = await localizeRemoteCover(coverUrl);
+      } else if (coverUrl && !SAFE_COVER_URL.test(coverUrl)) {
+        // Beklenmeyen şema (ör. CSS url() enjeksiyonu) — güvenli tarafta kal, at.
+        coverUrl = '';
       }
 
       const bookToSave: Book = {
@@ -554,7 +679,7 @@ export const importBooks = async (
 
       await saveBook(bookToSave);
       summary.imported += 1;
-      existingByTitleAuthor.set(titleAuthorKey, bookToSave);
+      existingByTitleAuthor.set(incomingKey, bookToSave);
     } catch (err) {
       summary.failed += 1;
       summary.errors.push(`${incoming.title || 'Bilinmeyen kitap'}: ${extractErrorMessage(err)}`);
@@ -562,4 +687,19 @@ export const importBooks = async (
   }
 
   return summary;
+};
+
+// Bir otomatik yedek girdisini geri yükler (içe aktarma sonrası kurtarma için).
+// Üzerine-yaz modu kullanır ve yeniden yedek almaz.
+export const restoreAutoBackup = async (entry: AutoBackupEntry): Promise<ImportSummary> => {
+  return importBooks(
+    {
+      version: 2,
+      exportedAt: entry.createdAt,
+      bookCount: entry.bookCount,
+      books: entry.books,
+      covers: [],
+    },
+    { conflictMode: 'overwrite', skipAutoBackup: true },
+  );
 };

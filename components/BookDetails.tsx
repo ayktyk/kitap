@@ -40,7 +40,7 @@ const BookDetails: React.FC<Props> = ({ book, onBack, onEdit }) => {
         <div className="relative -mt-20 mb-16 flex flex-col items-center text-center">
           <div
             className="w-44 h-64 bg-white/5 rounded-2xl shadow-2xl shrink-0 flex items-center justify-center bg-cover bg-center border-2 border-white/20 hover:scale-105 transition-transform duration-500 z-10"
-            style={{ backgroundImage: `url(${book.coverUrl || `https://picsum.photos/seed/${book.id}/300/450`})` }}
+            style={book.coverUrl ? { backgroundImage: `url(${book.coverUrl})` } : undefined}
           >
             {!book.coverUrl && <BookOpen className="text-white/10" size={50} />}
           </div>

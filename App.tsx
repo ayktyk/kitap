@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ArrowUpDown,
   Plus,
@@ -53,29 +53,32 @@ const AppContent: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('NEWEST');
   const [exportPayload, setExportPayload] = useState<{ json: string | null; fileName: string; bookCount: number; error?: string } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await libraryService.getBooks();
-        if (!cancelled) setBooks(data);
-      } catch (error) {
-        console.error('Kitaplık yüklenemedi:', error);
-        if (!cancelled) setBooks([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadBooks = async () => {
     const data = await libraryService.getBooks();
     setBooks(data);
   };
+
+  // İlk yükleme. getBooks başarısız olursa bunu boş kütüphaneyle KARIŞTIRMA —
+  // ayrı bir kurtarma ekranı göster (veri kaybı paniğini önler).
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await libraryService.getBooks();
+      setBooks(data);
+    } catch (error) {
+      console.error('Kitaplık yüklenemedi:', error);
+      setLoadError(error instanceof Error ? error.message : 'Bilinmeyen hata');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const handleSaveBook = async (book: Book) => {
     await libraryService.saveBook(book);
@@ -183,6 +186,37 @@ const AppContent: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--theme-bg)' }}>
         <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: 'var(--theme-border)', borderTopColor: 'var(--theme-ink)' }} />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    const backups = libraryService.listAutoBackups();
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-6"
+        style={{ backgroundColor: 'var(--theme-bg)', color: 'var(--theme-ink)' }}
+      >
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-black mb-3">Kütüphane açılamadı</h1>
+          <p className="text-sm opacity-70 mb-2">
+            Verileriniz silinmedi; cihazın deposu şu an okunamadı. Lütfen tekrar deneyin.
+          </p>
+          <p className="text-xs opacity-40 mb-5 break-words">{loadError}</p>
+          {backups.length > 0 && (
+            <p className="text-xs opacity-60 mb-5">
+              Son otomatik yedek: {new Date(backups[0].createdAt).toLocaleString('tr-TR')} ·{' '}
+              {backups[0].bookCount} kitap güvende.
+            </p>
+          )}
+          <button
+            onClick={reload}
+            className="px-6 py-3 rounded-xl font-bold"
+            style={{ backgroundColor: 'var(--theme-ink)', color: 'var(--theme-bg)' }}
+          >
+            Tekrar Dene
+          </button>
+        </div>
       </div>
     );
   }
