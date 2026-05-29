@@ -207,6 +207,22 @@ describe('libraryService — import sanitization & limits', () => {
     expect(summary.failed).toBe(0);
   });
 
+  it('does not persist covers for skipped books (no orphan cover records)', async () => {
+    await svc.saveBook(makeBook({ id: 'b1', title: 'Var', author: 'A' }));
+    const before = await countCovers();
+    const bundle = {
+      version: 2 as const,
+      exportedAt: new Date().toISOString(),
+      bookCount: 1,
+      books: [makeBook({ id: 'x', title: 'Var', author: 'A', coverUrl: 'local:c1' })],
+      covers: [{ id: 'c1', mimeType: 'image/png', data: btoa('imgdata') }],
+    };
+    const summary = await svc.importBooks(bundle, { conflictMode: 'skip' });
+    expect(summary.skipped).toBe(1);
+    expect(summary.imported).toBe(0);
+    expect(await countCovers()).toBe(before);
+  });
+
   it('drops unexpected coverUrl schemes on import (no CSS url() injection)', async () => {
     const bundle = {
       version: 2 as const,
@@ -218,6 +234,53 @@ describe('libraryService — import sanitization & limits', () => {
     await svc.importBooks(bundle, { conflictMode: 'duplicate' });
     const books = await svc.getBooks();
     expect(books[0].coverUrl).toBe('');
+  });
+});
+
+describe('libraryService — import preview', () => {
+  it('counts new vs conflicting books', async () => {
+    await svc.saveBook(makeBook({ id: 'b1', title: 'Var Olan', author: 'A' }));
+    const bundle = {
+      version: 2 as const,
+      exportedAt: new Date().toISOString(),
+      bookCount: 2,
+      books: [
+        makeBook({ id: 'x1', title: 'Var Olan', author: 'A' }),
+        makeBook({ id: 'x2', title: 'Yeni Kitap', author: 'B' }),
+      ],
+      covers: [],
+    };
+    const preview = await svc.previewImport(bundle);
+    expect(preview.total).toBe(2);
+    expect(preview.conflictCount).toBe(1);
+    expect(preview.newCount).toBe(1);
+  });
+});
+
+describe('libraryService — atomic import', () => {
+  it('rolls back the entire import if a write fails (no partial state)', async () => {
+    await svc.saveBook(makeBook({ id: 'keep', title: 'Kalsın', author: 'A' }));
+
+    // structured-clone edilemeyen bir alan -> put() DataCloneError -> tx abort.
+    const badBook = makeBook({ id: 'bad', title: 'Bozuk', author: 'B' }) as Book & {
+      evil?: unknown;
+    };
+    badBook.evil = () => undefined;
+
+    const bundle = {
+      version: 2 as const,
+      exportedAt: new Date().toISOString(),
+      bookCount: 1,
+      books: [badBook],
+      covers: [],
+    };
+
+    await expect(svc.importBooks(bundle as never, { conflictMode: 'duplicate' })).rejects.toThrow();
+
+    // Kütüphane değişmedi — sadece 'keep' var, 'bad' yazılmadı.
+    const books = await svc.getBooks();
+    expect(books).toHaveLength(1);
+    expect(books[0].id).toBe('keep');
   });
 });
 

@@ -355,21 +355,20 @@ export const saveCoverImage = async (file: Blob): Promise<string> => {
   return blobUrlForCover(id, file);
 };
 
-// Eski Supabase URL'sini ya da diğer http(s) URL'lerini kalıcı yerel kapağa
-// dönüştürür. CORS engellenirse orijinal URL'yi geri döndürür.
-async function localizeRemoteCover(remoteUrl: string): Promise<string> {
+// Uzak (http/https) kapağı transaction DIŞINDA indirir; çağıran, dönen blob'u
+// tek bir atomik yazma transaction'ında saklar. İndirilemezse null döner
+// (çağıran orijinal http(s) URL'sini korur).
+async function stageRemoteCover(
+  remoteUrl: string,
+): Promise<{ id: string; blob: Blob; mimeType: string } | null> {
   try {
     const response = await fetch(remoteUrl, { mode: 'cors' });
-    if (!response.ok) return remoteUrl;
+    if (!response.ok) return null;
     const blob = await response.blob();
-    const id = uuid();
-    await tx(COVERS_STORE, 'readwrite', (transaction) => {
-      transaction.objectStore(COVERS_STORE).put({ id, blob, mimeType: blob.type } as CoverRecord);
-    });
-    return `${LOCAL_PREFIX}${id}`;
+    return { id: uuid(), blob, mimeType: blob.type };
   } catch (error) {
-    console.warn('Uzak kapak indirilemedi, orijinal URL korunuyor:', remoteUrl, error);
-    return remoteUrl;
+    console.warn('Uzak kapak indirilemedi:', remoteUrl, error);
+    return null;
   }
 }
 
@@ -582,6 +581,37 @@ export const createAutoBackup = async (): Promise<AutoBackupEntry | null> => {
   }
 };
 
+export interface ImportPreview {
+  total: number;
+  newCount: number;
+  conflictCount: number;
+}
+
+// İçe aktarmadan önce kullanıcıya gösterilecek önizleme: kaç yeni, kaç çakışma.
+export const previewImport = async (bundle: AnyExportBundle): Promise<ImportPreview> => {
+  assertValidBundle(bundle);
+  await ensureInitialized();
+
+  const existing = await getBooks();
+  const existingKeys = new Set<string>();
+  for (const book of existing) {
+    const key = titleAuthorKey(book.title, book.author);
+    if (key !== '|') existingKeys.add(key);
+  }
+
+  let conflictCount = 0;
+  for (const book of bundle.books) {
+    const key = titleAuthorKey(book.title, book.author);
+    if (key !== '|' && existingKeys.has(key)) conflictCount += 1;
+  }
+
+  return {
+    total: bundle.books.length,
+    conflictCount,
+    newCount: bundle.books.length - conflictCount,
+  };
+};
+
 export const importBooks = async (
   bundle: AnyExportBundle,
   options: ImportOptions = { conflictMode: 'skip' },
@@ -602,28 +632,6 @@ export const importBooks = async (
     if (key !== '|') existingByTitleAuthor.set(key, book);
   }
 
-  // İçeri aktarılan kapakları önce yerel store'a yaz, eski id -> yeni id eşlemesi tut
-  const importedCoverMap = new Map<string, string>();
-  if (bundle.version === 2 && Array.isArray(bundle.covers)) {
-    await tx(COVERS_STORE, 'readwrite', (transaction) => {
-      const store = transaction.objectStore(COVERS_STORE);
-      for (const cover of bundle.covers) {
-        try {
-          if (typeof cover.data !== 'string' || cover.data.length > MAX_COVER_BASE64) {
-            console.warn('Kapak çok büyük veya geçersiz, atlanıyor:', cover.id);
-            continue;
-          }
-          const blob = base64ToBlob(cover.data, cover.mimeType || 'image/jpeg');
-          const newId = uuid();
-          store.put({ id: newId, blob, mimeType: cover.mimeType || blob.type } as CoverRecord);
-          importedCoverMap.set(cover.id, newId);
-        } catch (error) {
-          console.warn('Kapak içe aktarılamadı:', cover.id, error);
-        }
-      }
-    });
-  }
-
   const summary: ImportSummary = {
     total: bundle.books.length,
     imported: 0,
@@ -638,6 +646,28 @@ export const importBooks = async (
     return String(err);
   };
 
+  // 1) HAZIRLIK — tüm async iş (base64 decode + uzak kapak fetch) transaction
+  //    DIŞINDA yapılır; yazılacak kitap ve kapak listeleri toplanır.
+  const coverBlobsById = new Map<string, { blob: Blob; mimeType: string }>();
+  const importedCoverMap = new Map<string, string>();
+  if (bundle.version === 2 && Array.isArray(bundle.covers)) {
+    for (const cover of bundle.covers) {
+      try {
+        if (typeof cover.data !== 'string' || cover.data.length > MAX_COVER_BASE64) {
+          console.warn('Kapak çok büyük veya geçersiz, atlanıyor:', cover.id);
+          continue;
+        }
+        const blob = base64ToBlob(cover.data, cover.mimeType || 'image/jpeg');
+        const newId = uuid();
+        coverBlobsById.set(newId, { blob, mimeType: cover.mimeType || blob.type });
+        importedCoverMap.set(cover.id, newId);
+      } catch (error) {
+        console.warn('Kapak içe aktarılamadı:', cover.id, error);
+      }
+    }
+  }
+
+  const booksToWrite: Book[] = [];
   for (const incoming of bundle.books) {
     try {
       const incomingKey = titleAuthorKey(incoming.title, incoming.author);
@@ -649,19 +679,20 @@ export const importBooks = async (
       }
 
       const newId =
-        existingMatch && options.conflictMode === 'overwrite'
-          ? existingMatch.id
-          : uuid();
+        existingMatch && options.conflictMode === 'overwrite' ? existingMatch.id : uuid();
 
-      // CoverUrl normalleştirme
       let coverUrl = incoming.coverUrl || '';
       if (isLocalCoverRef(coverUrl)) {
         const oldId = localRefToId(coverUrl);
-        const newCoverId = importedCoverMap.get(oldId);
-        coverUrl = newCoverId ? `${LOCAL_PREFIX}${newCoverId}` : '';
+        const mappedId = importedCoverMap.get(oldId);
+        coverUrl = mappedId ? `${LOCAL_PREFIX}${mappedId}` : '';
       } else if (coverUrl && /^https?:\/\//i.test(coverUrl)) {
-        // Eski Supabase / dış URL — yerelleştirmeyi dene
-        coverUrl = await localizeRemoteCover(coverUrl);
+        const staged = await stageRemoteCover(coverUrl);
+        if (staged) {
+          coverBlobsById.set(staged.id, { blob: staged.blob, mimeType: staged.mimeType });
+          coverUrl = `${LOCAL_PREFIX}${staged.id}`;
+        }
+        // İndirilemezse coverUrl orijinal http(s) olarak kalır (güvenli şema).
       } else if (coverUrl && !SAFE_COVER_URL.test(coverUrl)) {
         // Beklenmeyen şema (ör. CSS url() enjeksiyonu) — güvenli tarafta kal, at.
         coverUrl = '';
@@ -671,14 +702,10 @@ export const importBooks = async (
         ...incoming,
         id: newId,
         coverUrl,
-        quotes: (incoming.quotes || []).map((q) => ({
-          ...q,
-          id: uuid(),
-        })),
+        isFavorite: incoming.isFavorite || incoming.rating === 10,
+        quotes: (incoming.quotes || []).map((q) => ({ ...q, id: uuid() })),
       };
-
-      await saveBook(bookToSave);
-      summary.imported += 1;
+      booksToWrite.push(bookToSave);
       existingByTitleAuthor.set(incomingKey, bookToSave);
     } catch (err) {
       summary.failed += 1;
@@ -686,6 +713,50 @@ export const importBooks = async (
     }
   }
 
+  // 2) YAZMA — tek readwrite transaction: ya hep ya hiç. Hata olursa tx abort
+  //    edilir, hiçbir kısmi değişiklik kalmaz (kütüphane bozulmaz).
+  if (booksToWrite.length > 0 || coverBlobsById.size > 0) {
+    const orphanCoverIds = await tx(
+      [BOOKS_STORE, COVERS_STORE],
+      'readwrite',
+      async (transaction) => {
+        const coversStore = transaction.objectStore(COVERS_STORE);
+        const booksStore = transaction.objectStore(BOOKS_STORE);
+
+        // Yalnızca bir kitabın referans verdiği kapakları yaz — atlanan/başarısız
+        // kitapların kapakları yetim kayıt olarak kalmasın (IDB şişmesi önlenir).
+        const referenced = new Set<string>();
+        for (const book of booksToWrite) {
+          if (isLocalCoverRef(book.coverUrl)) referenced.add(localRefToId(book.coverUrl));
+        }
+        for (const [id, record] of coverBlobsById) {
+          if (referenced.has(id)) {
+            coversStore.put({ id, blob: record.blob, mimeType: record.mimeType } as CoverRecord);
+          }
+        }
+
+        const orphans: string[] = [];
+        for (const book of booksToWrite) {
+          // Üzerine-yazmada eski kapak yetim kalıyorsa temizle.
+          const prev = (await reqToPromise(booksStore.get(book.id))) as Book | undefined;
+          if (prev && isLocalCoverRef(prev.coverUrl)) {
+            const prevId = localRefToId(prev.coverUrl);
+            const newId = isLocalCoverRef(book.coverUrl) ? localRefToId(book.coverUrl) : null;
+            if (prevId !== newId) {
+              coversStore.delete(prevId);
+              orphans.push(prevId);
+            }
+          }
+          booksStore.put(book);
+        }
+        return orphans;
+      },
+    );
+
+    for (const id of orphanCoverIds) revokeCover(id);
+  }
+
+  summary.imported = booksToWrite.length;
   return summary;
 };
 

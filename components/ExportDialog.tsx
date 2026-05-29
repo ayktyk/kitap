@@ -16,6 +16,7 @@ const ExportDialog: React.FC<Props> = ({ json, fileName, bookCount, error, onClo
   const [copied, setCopied] = useState(false);
   const downloadAnchorRef = useRef<HTMLAnchorElement | null>(null);
   const downloadUrlRef = useRef<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const ready = !!json && !error;
 
@@ -35,6 +36,16 @@ const ExportDialog: React.FC<Props> = ({ json, fileName, bookCount, error, onClo
     };
   }, [blobUrl]);
 
+  // Esc ile kapat + diyaloga odaklan (a11y).
+  useEffect(() => {
+    dialogRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const sizeText = useMemo(() => {
     if (!json) return '';
     const kb = json.length / 1024;
@@ -42,7 +53,7 @@ const ExportDialog: React.FC<Props> = ({ json, fileName, bookCount, error, onClo
     return `${(kb / 1024).toFixed(2)} MB`;
   }, [json]);
 
-  const canShare = (() => {
+  const canShare = useMemo(() => {
     if (!json) return false;
     const nav = navigator as Navigator & {
       canShare?: (data?: { files?: File[] }) => boolean;
@@ -55,7 +66,10 @@ const ExportDialog: React.FC<Props> = ({ json, fileName, bookCount, error, onClo
     } catch {
       return false;
     }
-  })();
+  }, [json, fileName]);
+
+  // Çok büyük yedeklerde Web Share bazı cihazlarda sessizce başarısız olabilir.
+  const largeBundle = !!json && json.length > 25 * 1024 * 1024;
 
   const handleShare = async () => {
     if (!json) return;
@@ -107,7 +121,12 @@ const ExportDialog: React.FC<Props> = ({ json, fileName, bookCount, error, onClo
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 shadow-2xl overflow-hidden"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Yedek Hazırla"
+        tabIndex={-1}
+        className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 shadow-2xl overflow-hidden outline-none"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
@@ -162,6 +181,16 @@ const ExportDialog: React.FC<Props> = ({ json, fileName, bookCount, error, onClo
                 Telefonun için en kolay yolu seç. Hangisi çalışırsa o iyi — bir tanesi olmazsa bir
                 sonrakini dene.
               </p>
+
+              {largeBundle && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-[11px] leading-relaxed">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <span>
+                    Yedek büyük ({sizeText}). Paylaşım bazı telefonlarda başarısız olabilir — olmazsa
+                    "Dosya Olarak İndir"i kullan.
+                  </span>
+                </div>
+              )}
 
               {canShare && (
                 <button

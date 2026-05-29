@@ -10,6 +10,7 @@ import BookDetails from './components/BookDetails';
 import BookForm from './components/BookForm';
 import BookList from './components/BookList';
 import ExportDialog from './components/ExportDialog';
+import ImportDialog from './components/ImportDialog';
 import Sidebar from './components/Sidebar';
 import ThemeSwitcher from './components/ThemeSwitcher';
 import * as libraryService from './services/libraryService';
@@ -54,6 +55,7 @@ const AppContent: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('NEWEST');
   const [exportPayload, setExportPayload] = useState<{ json: string | null; fileName: string; bookCount: number; error?: string } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   const loadBooks = async () => {
     const data = await libraryService.getBooks();
@@ -126,59 +128,29 @@ const AppContent: React.FC = () => {
     })();
   };
 
-  const handleImport = async (file: File) => {
+  // İçe aktarma akışı ImportDialog'a taşındı (önizleme + çakışma seçimi +
+  // otomatik yedek + yedekten geri yükleme). Burada sadece diyalogu açıyoruz.
+  const handleImport = (file: File) => {
+    setImportFile(file);
+  };
+
+  // Yükleme hatası ekranından en son otomatik yedeğe geri dönme (kurtarma).
+  const handleRestoreLatestBackup = async () => {
+    const backups = libraryService.listAutoBackups();
+    if (backups.length === 0) return;
+    const entry = backups[0];
+    if (
+      !window.confirm(
+        `En son otomatik yedek (${new Date(entry.createdAt).toLocaleString('tr-TR')}, ${entry.bookCount} kitap) geri yüklensin mi?`,
+      )
+    ) {
+      return;
+    }
     try {
-      const text = await file.text();
-      let bundle: libraryService.AnyExportBundle;
-      try {
-        bundle = JSON.parse(text);
-      } catch {
-        alert('Dosya geçerli bir JSON yedeği değil.');
-        return;
-      }
-
-      if (!libraryService.isValidBundle(bundle)) {
-        alert('Bu dosya bir Kitaplığım yedeği değil ya da bozuk. Dışa Aktar ile oluşturulmuş bir JSON dosyası seçin.');
-        return;
-      }
-
-      const fromInfo = bundle.exportedBy ? `\nKaynak hesap: ${bundle.exportedBy}` : '';
-      const choice = window.prompt(
-        `${bundle.bookCount} kitap içe aktarılacak.${fromInfo}\n\n` +
-        'Aynı kitap iki kayıtta da varsa ne yapılsın?\n' +
-        '  1 = Atla (mevcut kitabı koru) — varsayılan\n' +
-        '  2 = Üzerine yaz (yedekteki sürümle değiştir)\n' +
-        '  3 = Çift kayıt olarak ekle\n\n' +
-        '1, 2 veya 3 yazın:',
-        '1',
-      );
-
-      if (choice === null) {
-        return;
-      }
-
-      const conflictMode: libraryService.ImportOptions['conflictMode'] =
-        choice.trim() === '2' ? 'overwrite' : choice.trim() === '3' ? 'duplicate' : 'skip';
-
-      const summary = await libraryService.importBooks(bundle, { conflictMode });
-      await loadBooks();
-
-      const lines = [
-        `İçe aktarma tamamlandı.`,
-        `• Eklenen: ${summary.imported}`,
-        `• Atlanan: ${summary.skipped}`,
-        `• Başarısız: ${summary.failed}`,
-      ];
-      if (summary.errors.length > 0) {
-        lines.push('', 'Hatalar:', ...summary.errors.slice(0, 5));
-        if (summary.errors.length > 5) {
-          lines.push(`...ve ${summary.errors.length - 5} hata daha`);
-        }
-      }
-      alert(lines.join('\n'));
+      await libraryService.restoreAutoBackup(entry);
+      await reload();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Bilinmeyen hata';
-      alert(`İçe aktarma başarısız: ${message}`);
+      alert('Geri yükleme başarısız: ' + (err instanceof Error ? err.message : 'bilinmeyen hata'));
     }
   };
 
@@ -209,13 +181,24 @@ const AppContent: React.FC = () => {
               {backups[0].bookCount} kitap güvende.
             </p>
           )}
-          <button
-            onClick={reload}
-            className="px-6 py-3 rounded-xl font-bold"
-            style={{ backgroundColor: 'var(--theme-ink)', color: 'var(--theme-bg)' }}
-          >
-            Tekrar Dene
-          </button>
+          <div className="flex flex-col gap-2 items-center">
+            <button
+              onClick={reload}
+              className="px-6 py-3 rounded-xl font-bold"
+              style={{ backgroundColor: 'var(--theme-ink)', color: 'var(--theme-bg)' }}
+            >
+              Tekrar Dene
+            </button>
+            {backups.length > 0 && (
+              <button
+                onClick={handleRestoreLatestBackup}
+                className="px-6 py-2.5 rounded-xl font-semibold text-sm border"
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-ink)' }}
+              >
+                Son yedeği geri yükle
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -314,6 +297,14 @@ const AppContent: React.FC = () => {
           bookCount={exportPayload.bookCount}
           error={exportPayload.error}
           onClose={() => setExportPayload(null)}
+        />
+      )}
+
+      {importFile && (
+        <ImportDialog
+          file={importFile}
+          onClose={() => setImportFile(null)}
+          onImported={reload}
         />
       )}
 
