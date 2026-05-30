@@ -330,7 +330,7 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      <nav className="border-b border-white/5 sticky top-0 z-50 bg-black/20 backdrop-blur-xl">
+      <nav className="border-b border-white/5 sticky top-0 z-50 bg-black/20 backdrop-blur-xl safe-top">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-3">
@@ -400,7 +400,7 @@ const AppContent: React.FC = () => {
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative safe-bottom">
         {view === 'LIST' && (
           <div className="animate-fade-in-up">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">

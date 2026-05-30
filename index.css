@@ -342,6 +342,19 @@ h1, h2, h3 {
 .theme-font-mono { font-family: var(--theme-font-mono); }
 
 /* ============================================================
+   iOS PWA GÜVENLİ ALAN (safe-area)
+   black-translucent durum çubuğu altında içerik gizlenmesin diye üst sticky
+   bara çentik/durum çubuğu kadar padding verilir; arka plan ekranın en üstüne
+   kadar dolar (PWA'da üstte boşluk/bar kalmaz, tam ekrana oturur).
+   ============================================================ */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ============================================================
    KAYDIRMA & ANIMASYON
    ============================================================ */
 
