@@ -237,6 +237,22 @@ describe('libraryService — import sanitization & limits', () => {
   });
 });
 
+describe('libraryService — Turkish-locale dedup', () => {
+  it('treats İ/ı correctly (İSTANBUL == istanbul) so they dedup', async () => {
+    await svc.saveBook(makeBook({ id: 'b1', title: 'İSTANBUL', author: 'X' }));
+    const bundle = {
+      version: 2 as const,
+      exportedAt: new Date().toISOString(),
+      bookCount: 1,
+      books: [makeBook({ id: 'b2', title: 'istanbul', author: 'x' })],
+      covers: [],
+    };
+    const summary = await svc.importBooks(bundle, { conflictMode: 'skip' });
+    expect(summary.skipped).toBe(1);
+    expect(await svc.getBooks()).toHaveLength(1);
+  });
+});
+
 describe('libraryService — import preview', () => {
   it('counts new vs conflicting books', async () => {
     await svc.saveBook(makeBook({ id: 'b1', title: 'Var Olan', author: 'A' }));
@@ -254,6 +270,31 @@ describe('libraryService — import preview', () => {
     expect(preview.total).toBe(2);
     expect(preview.conflictCount).toBe(1);
     expect(preview.newCount).toBe(1);
+  });
+});
+
+describe('libraryService — reading sessions on import', () => {
+  it('regenerates session ids on import (like quotes)', async () => {
+    const bundle = {
+      version: 2 as const,
+      exportedAt: new Date().toISOString(),
+      bookCount: 1,
+      books: [
+        makeBook({
+          id: 'b1',
+          title: 'Oturumlu',
+          author: 'A',
+          sessions: [{ id: 'old-1', startDate: '2024-01-01', finished: true }],
+        }),
+      ],
+      covers: [],
+    };
+    await svc.importBooks(bundle, { conflictMode: 'duplicate' });
+    const books = await svc.getBooks();
+    expect(books).toHaveLength(1);
+    expect(books[0].sessions).toHaveLength(1);
+    expect(books[0].sessions![0].id).not.toBe('old-1');
+    expect(books[0].sessions![0].startDate).toBe('2024-01-01');
   });
 });
 

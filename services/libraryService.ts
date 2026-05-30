@@ -529,9 +529,11 @@ function assertValidBundle(value: unknown): void {
 export const isValidBundle = (value: unknown): value is AnyExportBundle =>
   bundleSchema.safeParse(value).success;
 
-// Başlık+yazar tekilleştirme anahtarı; string olmayan alanlara karşı güvenli.
-function titleAuthorKey(title: unknown, author: unknown): string {
-  const norm = (value: unknown) => String(value ?? '').trim().toLowerCase();
+// Başlık+yazar tekilleştirme anahtarı; string olmayan alanlara karşı güvenli,
+// Türkçe-locale (İ/ı) küçük harf. İçe aktarma tekilleştirmesi ve formdaki
+// yinelenen uyarısı AYNI anahtarı kullanır (tutarlılık).
+export function titleAuthorKey(title: unknown, author: unknown): string {
+  const norm = (value: unknown) => String(value ?? '').trim().toLocaleLowerCase('tr-TR');
   return `${norm(title)}|${norm(author)}`;
 }
 
@@ -704,6 +706,10 @@ export const importBooks = async (
         coverUrl,
         isFavorite: incoming.isFavorite || incoming.rating === 10,
         quotes: (incoming.quotes || []).map((q) => ({ ...q, id: uuid() })),
+        // İç içe id taşıyan alanlar için id yenile (çakışmayı önler).
+        ...(Array.isArray(incoming.sessions)
+          ? { sessions: incoming.sessions.map((s) => ({ ...s, id: uuid() })) }
+          : {}),
       };
       booksToWrite.push(bookToSave);
       existingByTitleAuthor.set(incomingKey, bookToSave);

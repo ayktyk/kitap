@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Barcode,
   BookOpen,
@@ -15,9 +15,9 @@ import {
 } from 'lucide-react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { v4 as uuidv4 } from 'uuid';
-import { Book, BookLookupResult, Quote } from '../types';
+import { Book, BookLookupResult, Quote, ReadingSession } from '../types';
 import { lookupBookByIsbn } from '../services/bookLookupService';
-import { saveCoverImage } from '../services/libraryService';
+import { saveCoverImage, titleAuthorKey } from '../services/libraryService';
 import RatingStars from './RatingStars';
 
 interface Props {
@@ -85,9 +85,14 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
     purchaseLocation: initialData?.purchaseLocation || '',
     thoughts: initialData?.thoughts || '',
     quotes: initialData?.quotes || [],
+    currentPage: initialData?.currentPage || 0,
+    tags: initialData?.tags || [],
+    sessions: initialData?.sessions || [],
     isFavorite: initialData?.isFavorite || false,
     createdAt: initialData?.createdAt || Date.now(),
   });
+
+  const [tagDraft, setTagDraft] = useState('');
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -119,6 +124,26 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
     setLocationSuggestions(Array.from(locations).sort((a, b) => a.localeCompare(b, 'tr')));
   }, [allBooks]);
+
+  // Mevcut kitaplardan etiket önerileri (otomatik tamamlama için).
+  const tagSuggestions = useMemo(() => {
+    const tags = new Set<string>();
+    allBooks.forEach((book) => {
+      (book.tags ?? []).forEach((tag) => {
+        if (tag.trim()) tags.add(tag.trim());
+      });
+    });
+    return Array.from(tags).sort((a, b) => a.localeCompare(b, 'tr'));
+  }, [allBooks]);
+
+  // Yinelenen kitap tespiti — yalnızca YENİ kitap eklerken (düzenlemede değil).
+  // İçe aktarma tekilleştirmesiyle aynı anahtar: başlık+yazar, tr-TR küçük harf + trim.
+  const duplicateBook = useMemo(() => {
+    if (initialData) return null; // düzenleme modunda uyarı gösterme
+    const key = titleAuthorKey(formData.title, formData.author);
+    if (key === '|') return null; // başlık+yazar boşsa uyarma
+    return allBooks.find((book) => titleAuthorKey(book.title, book.author) === key) ?? null;
+  }, [allBooks, initialData, formData.title, formData.author]);
 
   useEffect(() => {
     return () => {
@@ -291,6 +316,17 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
 
     try {
       setSaving(true);
+      // Taslakta kalmış (henüz Enter'a basılmamış) etiketi de kaydet.
+      const pendingTag = tagDraft.trim();
+      const mergedTags = [...(formData.tags ?? [])];
+      if (
+        pendingTag &&
+        !mergedTags.some(
+          (tag) => tag.toLocaleLowerCase('tr-TR') === pendingTag.toLocaleLowerCase('tr-TR'),
+        )
+      ) {
+        mergedTags.push(pendingTag);
+      }
       await onSave({
         ...formData,
         title: formData.title.trim(),
@@ -300,6 +336,7 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
         startLocation: formData.startLocation.trim(),
         endLocation: formData.endLocation.trim(),
         purchaseLocation: formData.purchaseLocation.trim(),
+        tags: mergedTags.map((tag) => tag.trim()).filter(Boolean),
       });
     } catch (error) {
       console.error('Save failed:', error);
@@ -337,6 +374,69 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
     setFormData((previous) => ({
       ...previous,
       quotes: previous.quotes.filter((quote) => quote.id !== id),
+    }));
+  };
+
+  const addTag = (rawValue: string) => {
+    const value = rawValue.trim();
+    if (!value) return;
+    setFormData((previous) => {
+      const existing = previous.tags ?? [];
+      // tr-TR küçük harf ile yinelenen etiketi engelle (büyük/küçük harf duyarsız).
+      const lowered = value.toLocaleLowerCase('tr-TR');
+      if (existing.some((tag) => tag.toLocaleLowerCase('tr-TR') === lowered)) {
+        return previous;
+      }
+      return { ...previous, tags: [...existing, value] };
+    });
+    setTagDraft('');
+  };
+
+  const removeTag = (tag: string) => {
+    setFormData((previous) => ({
+      ...previous,
+      tags: (previous.tags ?? []).filter((existing) => existing !== tag),
+    }));
+  };
+
+  const handleTagKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      addTag(tagDraft);
+    } else if (event.key === 'Backspace' && !tagDraft && (formData.tags ?? []).length > 0) {
+      // Boş alanda Backspace son etiketi siler (chip-input alışkanlığı).
+      const tags = formData.tags ?? [];
+      removeTag(tags[tags.length - 1]);
+    }
+  };
+
+  const addSession = () => {
+    setFormData((previous) => ({
+      ...previous,
+      sessions: [
+        ...(previous.sessions ?? []),
+        { id: uuidv4(), startDate: '', endDate: '', currentPage: 0, finished: false },
+      ],
+    }));
+  };
+
+  const updateSession = (
+    id: string,
+    field: keyof ReadingSession,
+    value: string | number | boolean,
+  ) => {
+    setFormData((previous) => ({
+      ...previous,
+      sessions: (previous.sessions ?? []).map((session) =>
+        session.id === id ? { ...session, [field]: value } : session,
+      ),
+    }));
+  };
+
+  const removeSession = (id: string) => {
+    setFormData((previous) => ({
+      ...previous,
+      sessions: (previous.sessions ?? []).filter((session) => session.id !== id),
     }));
   };
 
@@ -476,6 +576,20 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
               )}
             </div>
 
+            {duplicateBook && (
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-100">
+                <BookOpen size={18} className="mt-0.5 shrink-0 text-amber-300" />
+                <div className="text-xs leading-relaxed">
+                  <p className="font-bold mb-0.5">Bu kitap zaten kütüphanende olabilir</p>
+                  <p className="text-amber-100/70">
+                    "{duplicateBook.title}"
+                    {duplicateBook.author ? ` — ${duplicateBook.author}` : ''} adıyla kayıtlı bir
+                    kitap bulundu. Yine de eklemek istersen devam edebilirsin.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-6">
               {/* Cover + Title/Author row */}
               <div className="flex flex-col sm:flex-row gap-6 items-start">
@@ -578,6 +692,38 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                       placeholder="Örn: Klasik, Bilim Kurgu"
                     />
                   </div>
+
+                  {formData.status === 'READING' && (
+                    <div className="space-y-2 col-span-2">
+                      <label className="block text-sm font-semibold text-white/60">
+                        Şu An Hangi Sayfadayım
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.currentPage || ''}
+                        min={0}
+                        max={formData.pageCount || undefined}
+                        onChange={(event) =>
+                          setFormData((previous) => ({
+                            ...previous,
+                            currentPage: parseInt(event.target.value, 10) || 0,
+                          }))
+                        }
+                        className="w-full p-3 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none placeholder:text-white/20 transition-all"
+                        placeholder="0"
+                      />
+                      {formData.pageCount > 0 && (formData.currentPage ?? 0) > 0 && (
+                        <p className="text-[11px] text-white/40">
+                          {Math.min(
+                            100,
+                            Math.round(((formData.currentPage ?? 0) / formData.pageCount) * 100),
+                          )}
+                          % tamamlandı · {formData.pageCount} sayfanın{' '}
+                          {Math.min(formData.currentPage ?? 0, formData.pageCount)}. sayfası
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -619,6 +765,75 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Etiketler */}
+              <div className="space-y-2 relative">
+                <label className="block text-sm font-semibold text-white/60">Etiketler</label>
+                <div className="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl focus-within:ring-2 focus-within:ring-white/20 transition-all flex flex-wrap items-center gap-2">
+                  {(formData.tags ?? []).map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/10 border border-white/10 rounded-full text-xs text-white/80"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="text-white/40 hover:text-red-400 transition-colors cursor-pointer"
+                        aria-label={`${tag} etiketini kaldır`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    value={tagDraft}
+                    onChange={(event) => setTagDraft(event.target.value)}
+                    onKeyDown={handleTagKeyDown}
+                    onFocus={() => setActiveSuggestionField('tags')}
+                    onBlur={() => setTimeout(() => setActiveSuggestionField(null), 150)}
+                    className="flex-1 min-w-[120px] bg-transparent border-none focus:ring-0 outline-none text-white placeholder:text-white/20 text-sm p-1"
+                    placeholder={
+                      (formData.tags ?? []).length === 0
+                        ? 'Örn: favori, kütüphane, hediye (Enter ile ekle)'
+                        : 'Etiket ekle...'
+                    }
+                  />
+                </div>
+                {activeSuggestionField === 'tags' &&
+                  (() => {
+                    const draft = tagDraft.trim().toLocaleLowerCase('tr-TR');
+                    const current = new Set(
+                      (formData.tags ?? []).map((t) => t.toLocaleLowerCase('tr-TR')),
+                    );
+                    const matches = tagSuggestions
+                      .filter(
+                        (suggestion) =>
+                          !current.has(suggestion.toLocaleLowerCase('tr-TR')) &&
+                          (!draft || suggestion.toLocaleLowerCase('tr-TR').includes(draft)),
+                      )
+                      .slice(0, 6);
+                    if (matches.length === 0) return null;
+                    return (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-zinc-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden backdrop-blur-xl">
+                        {matches.map((suggestion) => (
+                          <button
+                            key={`tag-${suggestion}`}
+                            type="button"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              addTag(suggestion);
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-xs text-white/70 hover:bg-white/10 hover:text-white transition-colors border-b border-white/5 last:border-0 cursor-pointer"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
               </div>
             </div>
           </div>
@@ -693,6 +908,121 @@ const BookForm: React.FC<Props> = ({ initialData, allBooks, onSave, onCancel, on
                   />
                   {renderAutocomplete('endLocation', formData.endLocation)}
                 </div>
+              </div>
+            </div>
+
+            {/* Okuma Oturumları (yeniden okumalar) */}
+            <div className="space-y-6 pt-4 border-t border-white/5">
+              <div className="flex justify-between items-center gap-4">
+                <div>
+                  <label className="block text-xl font-serif font-bold text-white">
+                    Okuma Oturumları
+                  </label>
+                  <p className="text-white/30 text-xs mt-1">
+                    Kitabı birden fazla kez okuduysan her okumayı ayrı kaydedebilirsin.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addSession}
+                  className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-white bg-white/10 hover:bg-white/20 transition-all px-4 py-3 rounded-full border border-white/10 shadow-lg cursor-pointer active:scale-95 whitespace-nowrap"
+                >
+                  <Plus size={14} />
+                  Oturum Ekle
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {(formData.sessions ?? []).length === 0 && (
+                  <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-2xl text-white/15 text-sm">
+                    Henüz okuma oturumu eklenmedi.
+                  </div>
+                )}
+
+                {(formData.sessions ?? []).map((session, index) => (
+                  <div
+                    key={session.id}
+                    className="bg-white/5 p-5 rounded-2xl border border-white/5 group transition-all hover:bg-white/[0.08] space-y-4"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white/30">
+                        {index + 1}. Okuma
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeSession(session.id)}
+                        className="text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-red-500/10 rounded-lg cursor-pointer"
+                        aria-label="Oturumu sil"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-white/30">
+                          Başlangıç
+                        </label>
+                        <input
+                          type="date"
+                          value={session.startDate || ''}
+                          onChange={(event) =>
+                            updateSession(session.id, 'startDate', event.target.value)
+                          }
+                          className="w-full p-2.5 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none text-sm transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-white/30">
+                          Bitiş
+                        </label>
+                        <input
+                          type="date"
+                          value={session.endDate || ''}
+                          onChange={(event) =>
+                            updateSession(session.id, 'endDate', event.target.value)
+                          }
+                          className="w-full p-2.5 bg-white/5 text-white border border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-transparent outline-none text-sm transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white/20">
+                          Sayfa
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={session.currentPage || ''}
+                          onChange={(event) =>
+                            updateSession(
+                              session.id,
+                              'currentPage',
+                              parseInt(event.target.value, 10) || 0,
+                            )
+                          }
+                          className="w-20 text-xs p-1.5 bg-white/5 border border-white/10 rounded-md text-white focus:outline-none focus:border-white/30 transition-all"
+                          placeholder="No"
+                        />
+                      </div>
+
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!session.finished}
+                          onChange={(event) =>
+                            updateSession(session.id, 'finished', event.target.checked)
+                          }
+                          className="w-4 h-4 rounded accent-blue-400"
+                        />
+                        <span className="text-xs font-semibold text-white/60">Tamamlandı</span>
+                      </label>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

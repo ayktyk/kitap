@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { BookFilter } from '../types';
-import { X, Library, Star, Clock, Calendar, Bookmark, Palette, Download, Upload, HardDrive } from 'lucide-react';
+import { X, Library, Star, Clock, Calendar, Bookmark, Palette, Download, Upload, HardDrive, BarChart3 } from 'lucide-react';
 import { useTheme } from '../lib/themeContext';
 import { getThemeMeta } from '../lib/theme';
 import Logo from './Logo';
@@ -9,14 +9,16 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   activeFilter: BookFilter;
+  isStatsActive?: boolean;
   onFilterChange: (filter: BookFilter) => void;
   onNavigateHome: () => void;
+  onNavigateStats: () => void;
   onOpenThemeSwitcher: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
 }
 
-const Sidebar: React.FC<Props> = ({ isOpen, onClose, activeFilter, onFilterChange, onNavigateHome, onOpenThemeSwitcher, onExport, onImport }) => {
+const Sidebar: React.FC<Props> = ({ isOpen, onClose, activeFilter, isStatsActive, onFilterChange, onNavigateHome, onNavigateStats, onOpenThemeSwitcher, onExport, onImport }) => {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => {
@@ -96,15 +98,34 @@ const Sidebar: React.FC<Props> = ({ isOpen, onClose, activeFilter, onFilterChang
                   onClose();
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  activeFilter === item.id
+                  !isStatsActive && activeFilter === item.id
                     ? 'bg-white/10 text-white border border-white/10 shadow-lg'
                     : 'text-white/40 hover:text-white/70 hover:bg-white/5'
                 }`}
               >
-                <span className={activeFilter === item.id ? 'text-white' : 'text-white/30'}>{item.icon}</span>
+                <span className={!isStatsActive && activeFilter === item.id ? 'text-white' : 'text-white/30'}>{item.icon}</span>
                 <span className="text-sm font-semibold">{item.label}</span>
               </button>
             ))}
+
+            <div className="my-2 border-t border-white/5" />
+
+            <button
+              onClick={() => {
+                onNavigateStats();
+                onClose();
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                isStatsActive
+                  ? 'bg-white/10 text-white border border-white/10 shadow-lg'
+                  : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+              }`}
+            >
+              <span className={isStatsActive ? 'text-white' : 'text-white/30'}>
+                <BarChart3 size={18} />
+              </span>
+              <span className="text-sm font-semibold">İstatistikler</span>
+            </button>
           </nav>
 
           {/* Yedekleme + Tema seçimi + Footer */}

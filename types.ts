@@ -4,6 +4,14 @@ export interface Quote {
   page?: number;
 }
 
+export interface ReadingSession {
+  id: string;
+  startDate?: string;
+  endDate?: string;
+  currentPage?: number;
+  finished?: boolean;
+}
+
 export type BookStatus = 'READING' | 'WANT_TO_READ' | 'READ' | 'ABANDONED';
 export type BookFilter = BookStatus | 'ALL' | 'FAVORITES';
 
@@ -30,12 +38,17 @@ export interface Book {
   // Content
   thoughts: string;
   quotes: Quote[];
-  
+
+  // Progress & organization (P2)
+  currentPage?: number;
+  tags?: string[];
+  sessions?: ReadingSession[];
+
   isFavorite?: boolean;
   createdAt: number;
 }
 
-export type ViewState = 'LIST' | 'ADD' | 'EDIT' | 'DETAILS';
+export type ViewState = 'LIST' | 'ADD' | 'EDIT' | 'DETAILS' | 'STATS';
 
 export interface BookAIResponse {
   description?: string;

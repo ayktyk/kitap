@@ -78,6 +78,45 @@ const BookDetails: React.FC<Props> = ({ book, onBack, onEdit }) => {
           <div className="mt-5">
             <RatingStars rating={book.rating} readOnly size={22} />
           </div>
+
+          {(book.tags ?? []).length > 0 && (
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {(book.tags ?? []).map((tag) => (
+                <span
+                  key={tag}
+                  className="px-3 py-1 bg-white/5 text-white/50 border border-white/10 rounded-full text-[11px] font-semibold"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {book.status === 'READING' &&
+            book.pageCount > 0 &&
+            (book.currentPage ?? 0) > 0 &&
+            (() => {
+              const percent = Math.max(
+                0,
+                Math.min(100, Math.round(((book.currentPage ?? 0) / book.pageCount) * 100)),
+              );
+              return (
+                <div className="mt-6 w-full max-w-xs">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">
+                    <span>
+                      Sayfa {Math.min(book.currentPage ?? 0, book.pageCount)} / {book.pageCount}
+                    </span>
+                    <span>%{percent}</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-green-400/70 transition-all"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
         </div>
 
         {/* Journey */}
@@ -113,6 +152,45 @@ const BookDetails: React.FC<Props> = ({ book, onBack, onEdit }) => {
             </div>
           </div>
         </section>
+
+        {/* Reading sessions (re-reads) */}
+        {(book.sessions ?? []).length > 0 && (
+          <section className="mb-14">
+            <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-8 text-center">
+              Okuma Geçmişi <span className="text-white/10 ml-1">({(book.sessions ?? []).length})</span>
+            </h3>
+            <div className="grid gap-4">
+              {(book.sessions ?? []).map((session, index) => (
+                <div
+                  key={session.id}
+                  className="flex flex-wrap items-center gap-4 bg-white/[0.03] p-5 rounded-2xl border border-white/5"
+                >
+                  <span className="w-8 h-8 shrink-0 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[11px] font-black text-white/50">
+                    {index + 1}
+                  </span>
+                  <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-white/50">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar size={13} className="text-white/20" />
+                      {formatDate(session.startDate || '')}
+                      {session.endDate ? ` — ${formatDate(session.endDate)}` : ''}
+                    </span>
+                    {(session.currentPage ?? 0) > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <BookOpen size={13} className="text-white/20" />
+                        Sayfa {session.currentPage}
+                      </span>
+                    )}
+                  </div>
+                  {session.finished && (
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      Tamamlandı
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Thoughts */}
         {book.thoughts && (
