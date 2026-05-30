@@ -20,6 +20,24 @@ const readStoredTheme = (): ThemeKey => {
 const applyTheme = (key: ThemeKey) => {
   if (typeof document === 'undefined') return;
   document.documentElement.dataset.theme = key;
+
+  // PWA durum çubuğu rengini aktif temanın arka planına eşitle: iOS'ta üstteki
+  // bar uygulamanın rengiyle kaynaşır (uyumsuz kahverengi şerit kaybolur), yazı
+  // rengini iOS otomatik kontrast ayarlar.
+  try {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--theme-bg').trim();
+    if (bg) {
+      let meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', bg);
+    }
+  } catch {
+    /* getComputedStyle yoksa yoksay */
+  }
 };
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
